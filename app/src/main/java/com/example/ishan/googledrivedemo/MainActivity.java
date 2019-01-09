@@ -29,6 +29,8 @@ import javax.crypto.*;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
@@ -383,10 +385,11 @@ public class MainActivity extends Activity {
                     byte bytes[] = os.toByteArray();
                     String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();
 
-                    /*try (FileOutputStream stream = new FileOutputStream(baseDir + "/Encrypt." + retrieveExt)) {
+                    try (FileOutputStream stream = new FileOutputStream(baseDir + "/Encrypt." + retrieveExt)) {
                         stream.write(bytes);
-                    }*/
+                    }
 
+                    File encrypt = new File(baseDir + "/Encrypt." + retrieveExt);
                     File decrypt = new File(baseDir + "/Decrypt." + retrieveExt);
                     decryptFile(os.toByteArray(), decrypt);
 
