@@ -6,34 +6,73 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Message;
+import android.renderscript.ScriptGroup;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
+import android.view.InputEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
+
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.drive.*;
+import com.google.android.gms.drive.CreateFileActivityOptions;
+import com.google.android.gms.drive.DriveClient;
+import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFile;
+import com.google.android.gms.drive.DriveId;
+import com.google.android.gms.drive.DriveResourceClient;
+import com.google.android.gms.drive.Drive;
+import com.google.android.gms.drive.Metadata;
+import com.google.android.gms.drive.MetadataChangeSet;
+import com.google.android.gms.drive.OpenFileActivityOptions;
 import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.TaskCompletionSource;
 
-import javax.crypto.*;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
+import java.util.Base64;
+import java.util.Scanner;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.CipherInputStream;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 
 public class MainActivity extends Activity {
 
@@ -94,7 +133,7 @@ public class MainActivity extends Activity {
         catch (InvalidKeySpecException e) { }
     }
 
-   private void exqListener(){
+    private void exqListener(){
         logIn.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
@@ -143,11 +182,8 @@ public class MainActivity extends Activity {
             public void fileSelected(final File file) {
                 String fileExtension = getFileExtension(file.getPath());
                 if(fileExtension != null) {
-                    byte[] encrypted = encryptFile(file);
-                    if(encrypted == null){
-                        Toast.makeText(MainActivity.this, "ERROR ENCRYPTING", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+                    File encrypted = new File(file.getParent() + "/Encrypt." + fileExtension);
+                    encryptFile(file, encrypted);
                     saveFileToDrive(encrypted, fileExtension);
                 }
             }
@@ -194,44 +230,6 @@ public class MainActivity extends Activity {
         }catch (IOException e){
             fileOutput.setText("IOException");
         }
-    }
-
-    private byte[] encryptFile(File file){
-        try {
-            FileInputStream inputStream = new FileInputStream(file);
-            byte[] inputBytes = new byte[(int) file.length()];
-            inputStream.read(inputBytes);
-            byte[] outputByte = new byte[(int) file.length()];
-
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.ENCRYPT_MODE, this.secret);
-            //byte[] outputBytes = cipher.doFinal(inputBytes);
-            ByteArrayOutputStream os = new ByteArrayOutputStream();
-            CipherOutputStream outputStream = new CipherOutputStream(os,cipher);
-            InputStream is = new ByteArrayInputStream(inputBytes);
-            byte[] buffer = new byte[1024];
-            int len;
-            while((len=is.read(buffer)) != -1){
-                outputStream.write(buffer, 0, len);
-            }
-
-            outputByte = os.toByteArray();
-
-            is.close();
-            inputStream.close();
-            outputStream.close();
-
-            return outputByte;
-        }catch (InvalidKeyException e){
-            fileOutput.setText("InvalidKey");
-        }catch (NoSuchAlgorithmException e){
-            fileOutput.setText("NoSuchAlgorithm");
-        }catch (NoSuchPaddingException e){
-            fileOutput.setText("NoSuchPadding");
-        }catch (IOException e){
-            fileOutput.setText("IOException");
-        }
-        return null;
     }
 
     private void decryptFile(File encrypted, File decrypted){
@@ -286,25 +284,30 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void saveFileToDrive(byte[] encrypted, String ext) {
+    private void saveFileToDrive(File file, String ext) {
         // Start by creating a new contents, and setting a callback.
         Log.i(TAG, "Creating new contents.");
 
         mDriveResourceClient
                 .createContents()
                 .continueWithTask(
-                        task -> createFileIntentSender(task.getResult(), encrypted, ext))
+                        task -> createFileIntentSender(task.getResult(), file, ext))
                 .addOnFailureListener(
                         e -> Log.w(TAG, "Failed to create new contents.", e));
     }
 
-    private Task<Void> createFileIntentSender(DriveContents driveContents, byte[] encrypted, String ext) {
+    private Task<Void> createFileIntentSender(DriveContents driveContents, File file, String ext) {
         Log.i(TAG, "New contents created.");
         // Get an output stream for the contents.
         OutputStream outputStream = driveContents.getOutputStream();
 
         try {
-                outputStream.write(encrypted);
+            InputStream is = new FileInputStream(file);
+            byte fileByteArray[] = new byte[(int) file.length()];
+            while(is.read(fileByteArray) != -1){
+                outputStream.write(fileByteArray);
+            }
+            file.delete();
         } catch (IOException e) {
             Log.w(TAG, "Unable to write file contents.", e);
         }
@@ -385,13 +388,13 @@ public class MainActivity extends Activity {
                     byte bytes[] = os.toByteArray();
                     String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();
 
-                    try (FileOutputStream stream = new FileOutputStream(baseDir + "/Encrypt." + retrieveExt)) {
+                    /*try (FileOutputStream stream = new FileOutputStream(baseDir + "/Encrypt." + retrieveExt)) {
                         stream.write(bytes);
                     }
 
-                    File encrypt = new File(baseDir + "/Encrypt." + retrieveExt);
+                    File encrypt = new File(baseDir + "/Encrypt." + retrieveExt);*/
                     File decrypt = new File(baseDir + "/Decrypt." + retrieveExt);
-                    decryptFile(os.toByteArray(), decrypt);
+                    decryptFile(bytes, decrypt);
 
                     fileOutput.setText("File saved as " + baseDir + "/Decrypt." + retrieveExt);
 
@@ -476,7 +479,7 @@ public class MainActivity extends Activity {
 
     public  boolean isWriteStoragePermissionGranted() {
         if (Build.VERSION.SDK_INT >= 23) {
-            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     == PackageManager.PERMISSION_GRANTED) {
                 Log.v(TAG,"Permission is granted2");
                 return true;
