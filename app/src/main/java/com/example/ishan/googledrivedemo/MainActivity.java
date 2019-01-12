@@ -6,18 +6,16 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Message;
-import android.renderscript.ScriptGroup;
+import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
-import android.view.InputEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -38,35 +36,20 @@ import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.TaskCompletionSource;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.KeySpec;
-import java.util.Base64;
-import java.util.Scanner;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
@@ -92,23 +75,45 @@ public class MainActivity extends Activity {
     private Button logOut;
     private Button upload;
     private Button download;
+    private GoogleSignInClient googleSignInClient;
+    private boolean doubleBackToExitPressedOnce = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if(isReadStoragePermissionGranted() && isWriteStoragePermissionGranted()){
+        if (isReadStoragePermissionGranted() && isWriteStoragePermissionGranted()) {
             initWork();
             exqListener();
         }
     }
 
-    private void initWork(){
+    @Override
+    public void onBackPressed() {
+        if (doubleBackToExitPressedOnce) {
+            super.onBackPressed();
+            googleSignInClient.signOut();
+            return;
+        }
+
+        this.doubleBackToExitPressedOnce = true;
+        Toast.makeText(this, "Click BACK again to exit", Toast.LENGTH_SHORT).show();
+
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                doubleBackToExitPressedOnce = false;
+            }
+        }, 2000);
+    }
+
+    private void initWork() {
         this.fileOutput = (TextView) findViewById(R.id.textOutput);
         this.logIn = (Button) findViewById(R.id.logIn);
         this.logOut = (Button) findViewById(R.id.logOut);
         this.upload = (Button) findViewById(R.id.uploadFile);
         this.download = (Button) findViewById(R.id.download);
+        this.googleSignInClient = buildGoogleSignInClient();
 
         this.logOut.setEnabled(false);
         this.upload.setEnabled(false);
@@ -129,41 +134,56 @@ public class MainActivity extends Activity {
             SecretKey secretKey = factory.generateSecret(spec);
             this.secret = new SecretKeySpec(secretKey.getEncoded(), "AES");
             final KeyGenerator kg = KeyGenerator.getInstance("AES");
-        } catch (NoSuchAlgorithmException e) { }
-        catch (InvalidKeySpecException e) { }
+        } catch (NoSuchAlgorithmException e) {
+        } catch (InvalidKeySpecException e) {
+        }
     }
 
-    private void exqListener(){
-        logIn.setOnClickListener(new View.OnClickListener(){
+    private void exqListener() {
+        logIn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 signIn();
             }
         });
 
-        upload.setOnClickListener(new View.OnClickListener(){
+        upload.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 uploadFile();
             }
         });
 
-        download.setOnClickListener(new View.OnClickListener(){
+        download.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 pickTextFile();
             }
         });
+
+        logOut.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                googleSignInClient.signOut();
+                upload.setEnabled(false);
+                logIn.setEnabled(true);
+                download.setEnabled(false);
+                logOut.setEnabled(false);
+            }
+        });
     }
 
-    /** Start sign in activity. */
+    /**
+     * Start sign in activity.
+     */
     private void signIn() {
         Log.i(TAG, "Start sign in");
-        GoogleSignInClient GoogleSignInClient = buildGoogleSignInClient();
-        startActivityForResult(GoogleSignInClient.getSignInIntent(), REQUEST_CODE_SIGN_IN);
+        startActivityForResult(googleSignInClient.getSignInIntent(), REQUEST_CODE_SIGN_IN);
     }
 
-    /** Build a Google SignIn client. */
+    /**
+     * Build a Google SignIn client.
+     */
     private GoogleSignInClient buildGoogleSignInClient() {
         GoogleSignInOptions signInOptions =
                 new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -173,15 +193,14 @@ public class MainActivity extends Activity {
     }
 
 
-
-    private void uploadFile(){
+    private void uploadFile() {
         FileChooser fileChooser = new FileChooser(this);
 
         fileChooser.setFileListener(new FileChooser.FileSelectedListener() {
             @Override
             public void fileSelected(final File file) {
                 String fileExtension = getFileExtension(file.getPath());
-                if(fileExtension != null) {
+                if (fileExtension != null) {
                     File encrypted = new File(file.getParent() + "/Encrypt." + fileExtension);
                     encryptFile(file, encrypted);
                     saveFileToDrive(encrypted, fileExtension);
@@ -192,7 +211,7 @@ public class MainActivity extends Activity {
     }
 
     private static String getFileExtension(String fullName) {
-        if(isNullOrEmpty(fullName)){
+        if (isNullOrEmpty(fullName)) {
             return null;
         }
         String fileName = new File(fullName).getName();
@@ -201,12 +220,12 @@ public class MainActivity extends Activity {
     }
 
     private static boolean isNullOrEmpty(String str) {
-        if(str != null && !str.trim().isEmpty())
+        if (str != null && !str.trim().isEmpty())
             return false;
         return true;
     }
 
-    private void encryptFile(File file, File encrypted){
+    private void encryptFile(File file, File encrypted) {
         try {
             FileInputStream inputStream = new FileInputStream(file);
             byte[] inputBytes = new byte[(int) file.length()];
@@ -216,23 +235,23 @@ public class MainActivity extends Activity {
             cipher.init(Cipher.ENCRYPT_MODE, this.secret);
             //byte[] outputBytes = cipher.doFinal(inputBytes);
             FileOutputStream os = new FileOutputStream(encrypted);
-            CipherOutputStream outputStream = new CipherOutputStream(os,cipher);
+            CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
             outputStream.write(inputBytes);
 
             inputStream.close();
             outputStream.close();
-        }catch (InvalidKeyException e){
+        } catch (InvalidKeyException e) {
             fileOutput.setText("InvalidKey");
-        }catch (NoSuchAlgorithmException e){
+        } catch (NoSuchAlgorithmException e) {
             fileOutput.setText("NoSuchAlgorithm");
-        }catch (NoSuchPaddingException e){
+        } catch (NoSuchPaddingException e) {
             fileOutput.setText("NoSuchPadding");
-        }catch (IOException e){
+        } catch (IOException e) {
             fileOutput.setText("IOException");
         }
     }
 
-    private void decryptFile(File encrypted, File decrypted){
+    private void decryptFile(File encrypted, File decrypted) {
         try {
             FileInputStream inputStream = new FileInputStream(encrypted);
             byte[] inputBytes = new byte[(int) encrypted.length()];
@@ -242,7 +261,7 @@ public class MainActivity extends Activity {
             //byte[] outputBytes = cipher.doFinal(inputBytes);
 
             FileOutputStream os = new FileOutputStream(decrypted);
-            CipherOutputStream outputStream = new CipherOutputStream(os,cipher);
+            CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
             outputStream.write(inputBytes);
 
             inputStream.close();
@@ -260,14 +279,14 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void decryptFile(byte[] encrypted, File decrypted){
+    private void decryptFile(byte[] encrypted, File decrypted) {
         try {
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.DECRYPT_MODE, secret);
             //byte[] outputBytes = cipher.doFinal(inputBytes);
 
             FileOutputStream os = new FileOutputStream(decrypted);
-            CipherOutputStream outputStream = new CipherOutputStream(os,cipher);
+            CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
             outputStream.write(encrypted);
 
             outputStream.close();
@@ -304,7 +323,7 @@ public class MainActivity extends Activity {
         try {
             InputStream is = new FileInputStream(file);
             byte fileByteArray[] = new byte[(int) file.length()];
-            while(is.read(fileByteArray) != -1){
+            while (is.read(fileByteArray) != -1) {
                 outputStream.write(fileByteArray);
             }
             file.delete();
@@ -381,7 +400,7 @@ public class MainActivity extends Activity {
                     byte[] buffer = new byte[1024];
                     int len;
 
-                    while((len=is.read(buffer)) != -1){
+                    while ((len = is.read(buffer)) != -1) {
                         os.write(buffer, 0, len);
                     }
 
@@ -431,7 +450,7 @@ public class MainActivity extends Activity {
                     this.logOut.setEnabled(true);
                     this.upload.setEnabled(true);
                     this.download.setEnabled(true);
-                }else{
+                } else {
                     fileOutput.setText("Failed to sign in");
                 }
                 break;
@@ -440,7 +459,7 @@ public class MainActivity extends Activity {
                 // Called after a file is saved to Drive.
                 if (resultCode == RESULT_OK) {
                     fileOutput.setText("Upload successful");
-                }else{
+                } else {
                     fileOutput.setText("Upload unsuccessful");
                 }
                 break;
@@ -462,36 +481,34 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 23) {
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
                     == PackageManager.PERMISSION_GRANTED) {
-                Log.v(TAG,"Permission is granted1");
+                Log.v(TAG, "Permission is granted1");
                 return true;
             } else {
 
-                Log.v(TAG,"Permission is revoked1");
+                Log.v(TAG, "Permission is revoked1");
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 3);
                 return false;
             }
-        }
-        else { //permission is automatically granted on sdk<23 upon installation
-            Log.v(TAG,"Permission is granted1");
+        } else { //permission is automatically granted on sdk<23 upon installation
+            Log.v(TAG, "Permission is granted1");
             return true;
         }
     }
 
-    public  boolean isWriteStoragePermissionGranted() {
+    public boolean isWriteStoragePermissionGranted() {
         if (Build.VERSION.SDK_INT >= 23) {
             if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     == PackageManager.PERMISSION_GRANTED) {
-                Log.v(TAG,"Permission is granted2");
+                Log.v(TAG, "Permission is granted2");
                 return true;
             } else {
 
-                Log.v(TAG,"Permission is revoked2");
+                Log.v(TAG, "Permission is revoked2");
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2);
                 return false;
             }
-        }
-        else { //permission is automatically granted on sdk<23 upon installation
-            Log.v(TAG,"Permission is granted2");
+        } else { //permission is automatically granted on sdk<23 upon installation
+            Log.v(TAG, "Permission is granted2");
             return true;
         }
     }
@@ -502,19 +519,19 @@ public class MainActivity extends Activity {
         switch (requestCode) {
             case 2:
                 Log.d(TAG, "External storage2");
-                if(grantResults[0]== PackageManager.PERMISSION_GRANTED){
-                    Log.v(TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.v(TAG, "Permission: " + permissions[0] + "was " + grantResults[0]);
                     //resume tasks needing this permission
-                }else{
+                } else {
                 }
                 break;
 
             case 3:
                 Log.d(TAG, "External storage1");
-                if(grantResults[0]== PackageManager.PERMISSION_GRANTED){
-                    Log.v(TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.v(TAG, "Permission: " + permissions[0] + "was " + grantResults[0]);
                     //resume tasks needing this permission
-                }else{
+                } else {
                 }
                 break;
         }
