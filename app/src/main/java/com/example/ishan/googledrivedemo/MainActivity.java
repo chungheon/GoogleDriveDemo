@@ -233,7 +233,6 @@ public class MainActivity extends Activity {
 
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.ENCRYPT_MODE, this.secret);
-            //byte[] outputBytes = cipher.doFinal(inputBytes);
             FileOutputStream os = new FileOutputStream(encrypted);
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
             outputStream.write(inputBytes);
@@ -258,7 +257,6 @@ public class MainActivity extends Activity {
             inputStream.read(inputBytes);
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.DECRYPT_MODE, secret);
-            //byte[] outputBytes = cipher.doFinal(inputBytes);
 
             FileOutputStream os = new FileOutputStream(decrypted);
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
@@ -283,7 +281,6 @@ public class MainActivity extends Activity {
         try {
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.DECRYPT_MODE, secret);
-            //byte[] outputBytes = cipher.doFinal(inputBytes);
 
             FileOutputStream os = new FileOutputStream(decrypted);
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
