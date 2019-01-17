@@ -37,4 +37,21 @@
         android:id="@+id/logOut"
         android:text="logOut"/>
 
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/sendCode"
+        android:text="Send Code"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/resendCode"
+        android:text="Resend Code"/>
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/code"/>
+
 </LinearLayout>

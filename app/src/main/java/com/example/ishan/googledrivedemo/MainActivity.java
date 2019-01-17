@@ -10,31 +10,48 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.drive.CreateFileActivityOptions;
+import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.DriveClient;
 import com.google.android.gms.drive.DriveContents;
 import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.DriveResourceClient;
-import com.google.android.gms.drive.Drive;
 import com.google.android.gms.drive.Metadata;
 import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.gms.drive.OpenFileActivityOptions;
 import com.google.android.gms.drive.query.Filters;
 import com.google.android.gms.drive.query.SearchableField;
 import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.TaskCompletionSource;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseException;
+import com.google.firebase.FirebaseTooManyRequestsException;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.auth.PhoneAuthCredential;
+import com.google.firebase.auth.PhoneAuthProvider;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -47,6 +64,7 @@ import java.io.OutputStream;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.concurrent.TimeUnit;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
@@ -63,25 +81,42 @@ public class MainActivity extends Activity {
     private static final int REQUEST_CODE_SIGN_IN = 0;
     private static final int REQUEST_CODE_CREATOR = 2;
     private static final int REQUEST_CODE_OPEN_ITEM = 5;
+    private static final String KEY_VERIFY_IN_PROGRESS = "key_verify_in_progress";
+    private static final int STATE_INITIALIZED = 1;
+    private static final int STATE_CODE_SENT = 2;
+    private static final int STATE_VERIFY_FAILED = 3;
+    private static final int STATE_VERIFY_SUCCESS = 4;
+    private static final int STATE_SIGNIN_FAILED = 5;
+    private static final int STATE_SIGNIN_SUCCESS = 6;
     private SecretKeySpec secret;
 
     private DriveClient mDriveClient;
     private DriveResourceClient mDriveResourceClient;
     private TaskCompletionSource<DriveId> mOpenItemTaskSource;
+    private FirebaseAuth mAuth;
     private String retrieveExt = "";
 
     private TextView fileOutput;
+    private EditText codeField;
     private Button logIn;
     private Button logOut;
     private Button upload;
     private Button download;
+    private Button sendCode;
+    private Button resendCode;
     private GoogleSignInClient googleSignInClient;
     private boolean doubleBackToExitPressedOnce = false;
+
+    private boolean mVerificationInProgress = false;
+    private String mVerificationId;
+    private PhoneAuthProvider.ForceResendingToken mResendToken;
+    private PhoneAuthProvider.OnVerificationStateChangedCallbacks mCallbacks;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        FirebaseApp.initializeApp(this);
         if (isReadStoragePermissionGranted() && isWriteStoragePermissionGranted()) {
             initWork();
             exqListener();
@@ -114,6 +149,12 @@ public class MainActivity extends Activity {
         this.upload = (Button) findViewById(R.id.uploadFile);
         this.download = (Button) findViewById(R.id.download);
         this.googleSignInClient = buildGoogleSignInClient();
+        this.codeField = (EditText) findViewById(R.id.code);
+        this.sendCode = (Button) findViewById(R.id.sendCode);
+        this.resendCode = (Button) findViewById(R.id.resendCode);
+        this.sendCode.setVisibility(View.GONE);
+        this.resendCode.setVisibility(View.GONE);
+        this.codeField.setVisibility(View.GONE);
 
         this.logOut.setEnabled(false);
         this.upload.setEnabled(false);
@@ -137,6 +178,132 @@ public class MainActivity extends Activity {
         } catch (NoSuchAlgorithmException e) {
         } catch (InvalidKeySpecException e) {
         }
+
+        mAuth = FirebaseAuth.getInstance();
+
+        mCallbacks = new PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+
+            @Override
+            public void onVerificationCompleted(PhoneAuthCredential credential) {
+                // This callback will be invoked in two situations:
+                // 1 - Instant verification. In some cases the phone number can be instantly
+                //     verified without needing to send or enter a verification code.
+                // 2 - Auto-retrieval. On some devices Google Play services can automatically
+                //     detect the incoming verification SMS and perform verification without
+                //     user action.
+                Log.d(TAG, "onVerificationCompleted:" + credential);
+                // [START_EXCLUDE silent]
+                mVerificationInProgress = false;
+                // [END_EXCLUDE]
+            }
+
+            @Override
+            public void onVerificationFailed(FirebaseException e) {
+                // This callback is invoked in an invalid request for verification is made,
+                // for instance if the the phone number format is not valid.
+                Log.w(TAG, "onVerificationFailed", e);
+                // [START_EXCLUDE silent]
+                mVerificationInProgress = false;
+                // [END_EXCLUDE]
+
+                if (e instanceof FirebaseAuthInvalidCredentialsException) {
+                    // Invalid request
+                    // [START_EXCLUDE]
+                    fileOutput.setText("Invalid phone number.");
+                    // [END_EXCLUDE]
+                } else if (e instanceof FirebaseTooManyRequestsException) {
+                    // The SMS quota for the project has been exceeded
+                    // [START_EXCLUDE]
+                    fileOutput.setText("Text Sent Quota exceeded");
+                    // [END_EXCLUDE]
+                }
+
+                // Show a message and update the UI
+                // [START_EXCLUDE]
+                // [END_EXCLUDE]
+            }
+
+            @Override
+            public void onCodeSent(String verificationId,
+                                   PhoneAuthProvider.ForceResendingToken token) {
+                // The SMS verification code has been sent to the provided phone number, we
+                // now need to ask the user to enter the code and then construct a credential
+                // by combining the code with a verification ID.
+                Log.d(TAG, "onCodeSent:" + verificationId);
+
+                // Save verification ID and resending token so we can use them later
+                mVerificationId = verificationId;
+                mResendToken = token;
+                fileOutput.setText("Code has been sent");
+                codeField.setVisibility(View.VISIBLE);
+                sendCode.setVisibility(View.VISIBLE);
+                resendCode.setVisibility(View.VISIBLE);
+            }
+        };
+        // [END phone_auth_callbacks]
+    }
+
+    private void startPhoneNumberVerification(String phoneNumber) {
+        // [START start_phone_auth]
+        PhoneAuthProvider.getInstance().verifyPhoneNumber(
+                phoneNumber,        // Phone number to verify
+                15,                 // Timeout duration
+                TimeUnit.SECONDS,   // Unit of timeout
+                this,               // Activity (for callback binding)
+                mCallbacks);        // OnVerificationStateChangedCallbacks
+        // [END start_phone_auth]
+
+        mVerificationInProgress = true;
+    }
+
+    private void verifyPhoneNumberWithCode(String verificationId, String code) {
+        // [START verify_with_code]
+        PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationId, code);
+        // [END verify_with_code]
+        mAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            Log.d(TAG, "signInWithCredential:success");
+                            FirebaseUser user = task.getResult().getUser();
+                            fileOutput.setText("Signed In");
+                            logIn.setEnabled(false);
+                            logOut.setEnabled(true);
+                            upload.setEnabled(true);
+                            download.setEnabled(true);
+                            codeField.setVisibility(View.GONE);
+                            sendCode.setVisibility(View.GONE);
+                            resendCode.setVisibility(View.GONE);
+                        } else {
+                            Log.w(TAG, "signInWithCredential:failure", task.getException());
+                            fileOutput.setText("Invalid Code");
+                        }
+                    }
+                });
+    }
+
+    private void resendVerificationCode(String phoneNumber,
+                                        PhoneAuthProvider.ForceResendingToken token) {
+        PhoneAuthProvider.getInstance().verifyPhoneNumber(
+                phoneNumber,        // Phone number to verify
+                15,                 // Timeout duration
+                TimeUnit.SECONDS,   // Unit of timeout
+                this,               // Activity (for callback binding)
+                mCallbacks,         // OnVerificationStateChangedCallbacks
+                token);             // ForceResendingToken from callbacks
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(KEY_VERIFY_IN_PROGRESS, mVerificationInProgress);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        mVerificationInProgress = savedInstanceState.getBoolean(KEY_VERIFY_IN_PROGRESS);
     }
 
     private void exqListener() {
@@ -165,10 +332,25 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 googleSignInClient.signOut();
+                mAuth.signOut();
                 upload.setEnabled(false);
                 logIn.setEnabled(true);
                 download.setEnabled(false);
                 logOut.setEnabled(false);
+            }
+        });
+
+        sendCode.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                verifyPhoneNumberWithCode(mVerificationId, codeField.getText().toString());
+            }
+        });
+
+        resendCode.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                resendVerificationCode(mAuth.getCurrentUser().getPhoneNumber(), mResendToken);
             }
         });
     }
@@ -187,7 +369,9 @@ public class MainActivity extends Activity {
     private GoogleSignInClient buildGoogleSignInClient() {
         GoogleSignInOptions signInOptions =
                 new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestIdToken(getString(R.string.default_web_client_id))
                         .requestScopes(Drive.SCOPE_FILE)
+                        .requestEmail()
                         .build();
         return GoogleSignIn.getClient(this, signInOptions);
     }
@@ -300,6 +484,40 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
+        Log.d(TAG, "firebaseAuthWithGoogle:" + acct.getId());
+
+        AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
+        mAuth.signInWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            AuthResult a = task.getResult();
+                            boolean newUser = a.getAdditionalUserInfo().isNewUser();
+                            if(newUser){
+                                mAuth.getCurrentUser().delete();
+                                mAuth.signOut();
+                                mAuth = FirebaseAuth.getInstance();
+                            }else{
+                                Log.d(TAG, "signInWithCredential:success");
+                                FirebaseUser user = mAuth.getCurrentUser();
+                                String phone = user.getPhoneNumber();
+                                if(phone.isEmpty()){
+                                    fileOutput.setText("Phone not connected please enter valid phone to continue");
+                                }else{
+                                    startPhoneNumberVerification(phone);
+                                }
+                            }
+                        } else {
+                            // If sign in fails, display a message to the user.
+                            Log.w(TAG, "signInWithCredential:failure", task.getException());
+                            Exception e = task.getException();
+                        }
+                    }
+                });
+    }
+
     private void saveFileToDrive(File file, String ext) {
         // Start by creating a new contents, and setting a callback.
         Log.i(TAG, "Creating new contents.");
@@ -311,6 +529,8 @@ public class MainActivity extends Activity {
                 .addOnFailureListener(
                         e -> Log.w(TAG, "Failed to create new contents.", e));
     }
+
+
 
     private Task<Void> createFileIntentSender(DriveContents driveContents, File file, String ext) {
         Log.i(TAG, "New contents created.");
@@ -441,12 +661,13 @@ public class MainActivity extends Activity {
                     // Build a drive resource client.
                     mDriveResourceClient =
                             Drive.getDriveResourceClient(this, GoogleSignIn.getLastSignedInAccount(this));
-                    // Start camera.
-                    fileOutput.setText("Successfully Signed In");
-                    this.logIn.setEnabled(false);
-                    this.logOut.setEnabled(true);
-                    this.upload.setEnabled(true);
-                    this.download.setEnabled(true);
+                    Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+                    try {
+                        GoogleSignInAccount account = task.getResult(ApiException.class);
+                        firebaseAuthWithGoogle(account);
+                    } catch (ApiException e) {
+                        fileOutput.setText("FAILED APIEXCEPTION");
+                    }
                 } else {
                     fileOutput.setText("Failed to sign in");
                 }

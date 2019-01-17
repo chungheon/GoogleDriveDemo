@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "859436352373",
+    "firebase_url": "https://gifted-airway-227908.firebaseio.com",
+    "project_id": "gifted-airway-227908",
+    "storage_bucket": "gifted-airway-227908.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:859436352373:android:8bfad66278b8b76f",
+        "android_client_info": {
+          "package_name": "com.example.ishan.googledrivedemo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "859436352373-8dmcctb4sbbtr39am80fcmhurujts72i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ishan.googledrivedemo",
+            "certificate_hash": "e5a84523b5833953021ffdc20e70fb767914c25d"
+          }
+        },
+        {
+          "client_id": "859436352373-s3tv7gssnq9dtuchonh1qedbp3enadv2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkXprnWf_jAgPbW3QcWNfSjx1nBnXW_ng"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "859436352373-s3tv7gssnq9dtuchonh1qedbp3enadv2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
