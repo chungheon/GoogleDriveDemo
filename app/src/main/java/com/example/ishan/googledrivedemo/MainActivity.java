@@ -170,6 +170,28 @@ public class MainActivity extends Activity {
         this.upload.setEnabled(false);
         this.download.setEnabled(false);
 
+        byte[] ivBytes;
+        String password="Hello";
+        /*you can give whatever you want for password. This is for testing purpose*/
+        SecureRandom random = new SecureRandom();
+        byte bytes[] = {1,1,1,1,1,1};
+        byte[] saltBytes = bytes;
+        // Derive the key
+        SecretKeyFactory factory = null;
+        try {
+            factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(),saltBytes,65556,256);
+        SecretKey secretKey = null;
+        try {
+            secretKey = factory.generateSecret(spec);
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        }
+        this.secret = new SecretKeySpec(secretKey.getEncoded(), "AES");
+
 
         mAuth = FirebaseAuth.getInstance();
 
@@ -427,7 +449,7 @@ public class MainActivity extends Activity {
         return true;
     }
 
-    private void encryptFile(File file, File encrypted) {
+    public void encryptFile(File file, File encrypted) {
         try {
             FileInputStream inputStream = new FileInputStream(file);
             byte[] inputBytes = new byte[(int) file.length()];
