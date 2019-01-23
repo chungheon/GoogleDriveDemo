@@ -16,6 +16,12 @@
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:id="@+id/logInEmail"
+        android:text="Log in with email and pw"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:id="@+id/uploadFile"
         android:text="Upload File"/>
 
@@ -53,5 +59,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/code"/>
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/email"/>
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/pwd"/>
+
 
 </LinearLayout>

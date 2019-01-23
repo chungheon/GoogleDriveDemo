@@ -45,6 +45,7 @@ import com.google.firebase.FirebaseException;
 import com.google.firebase.FirebaseTooManyRequestsException;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.EmailAuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.google.firebase.auth.FirebaseAuthUserCollisionException;
@@ -63,6 +64,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.util.concurrent.TimeUnit;
 
@@ -93,17 +95,20 @@ public class MainActivity extends Activity {
     private DriveClient mDriveClient;
     private DriveResourceClient mDriveResourceClient;
     private TaskCompletionSource<DriveId> mOpenItemTaskSource;
-    private FirebaseAuth mAuth;
+    public static FirebaseAuth mAuth;
     private String retrieveExt = "";
 
     private TextView fileOutput;
     private EditText codeField;
+    private EditText emailField;
+    private EditText pwdField;
     private Button logIn;
     private Button logOut;
     private Button upload;
     private Button download;
     private Button sendCode;
     private Button resendCode;
+    private Button logInEmail;
     private GoogleSignInClient googleSignInClient;
     private boolean doubleBackToExitPressedOnce = false;
 
@@ -142,6 +147,7 @@ public class MainActivity extends Activity {
         }, 2000);
     }
 
+
     private void initWork() {
         this.fileOutput = (TextView) findViewById(R.id.textOutput);
         this.logIn = (Button) findViewById(R.id.logIn);
@@ -152,6 +158,10 @@ public class MainActivity extends Activity {
         this.codeField = (EditText) findViewById(R.id.code);
         this.sendCode = (Button) findViewById(R.id.sendCode);
         this.resendCode = (Button) findViewById(R.id.resendCode);
+        this.logInEmail = (Button) findViewById(R.id.logInEmail);
+        this.emailField = (EditText) findViewById(R.id.email);
+        this.pwdField = (EditText) findViewById(R.id.pwd);
+
         this.sendCode.setVisibility(View.GONE);
         this.resendCode.setVisibility(View.GONE);
         this.codeField.setVisibility(View.GONE);
@@ -160,24 +170,6 @@ public class MainActivity extends Activity {
         this.upload.setEnabled(false);
         this.download.setEnabled(false);
 
-        final String password = "password";
-
-        // Here the magic numbers
-        final int pswdIterations = 65536;
-        final int keySize = 128;
-
-        final byte[] saltBytes = {0, 1, 2, 3, 4, 5, 6};
-
-        SecretKeyFactory factory = null;
-        try {
-            factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-            PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), saltBytes, pswdIterations, keySize);
-            SecretKey secretKey = factory.generateSecret(spec);
-            this.secret = new SecretKeySpec(secretKey.getEncoded(), "AES");
-            final KeyGenerator kg = KeyGenerator.getInstance("AES");
-        } catch (NoSuchAlgorithmException e) {
-        } catch (InvalidKeySpecException e) {
-        }
 
         mAuth = FirebaseAuth.getInstance();
 
@@ -267,20 +259,40 @@ public class MainActivity extends Activity {
                         if (task.isSuccessful()) {
                             Log.d(TAG, "signInWithCredential:success");
                             FirebaseUser user = task.getResult().getUser();
-                            fileOutput.setText("Signed In");
-                            logIn.setEnabled(false);
-                            logOut.setEnabled(true);
-                            upload.setEnabled(true);
-                            download.setEnabled(true);
-                            codeField.setVisibility(View.GONE);
-                            sendCode.setVisibility(View.GONE);
-                            resendCode.setVisibility(View.GONE);
+                            loggedIn();
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
                             fileOutput.setText("Invalid Code");
                         }
                     }
                 });
+    }
+
+    private void loggedIn(){
+        logIn.setVisibility(View.GONE);
+        logInEmail.setVisibility(View.GONE);
+        emailField.setText("");
+        emailField.setVisibility(View.GONE);
+        pwdField.setText("");
+        pwdField.setVisibility(View.GONE);
+        logOut.setEnabled(true);
+        upload.setEnabled(true);
+        download.setEnabled(true);
+        codeField.setVisibility(View.GONE);
+        sendCode.setVisibility(View.GONE);
+        resendCode.setVisibility(View.GONE);
+        fileOutput.setText("Signed In");
+    }
+
+    private void loggedOut(){
+        logIn.setVisibility(View.VISIBLE);
+        logInEmail.setVisibility(View.VISIBLE);
+        emailField.setVisibility(View.VISIBLE);
+        pwdField.setVisibility(View.VISIBLE);
+        logOut.setEnabled(false);
+        upload.setEnabled(false);
+        download.setEnabled(false);
+        fileOutput.setText("Logged Out");
     }
 
     private void resendVerificationCode(String phoneNumber,
@@ -317,7 +329,9 @@ public class MainActivity extends Activity {
         upload.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                uploadFile();
+                //uploadFile();
+                Intent intent = new Intent(MainActivity.this, GroupSharing.class);
+                startActivity(intent);
             }
         });
 
@@ -333,10 +347,7 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 googleSignInClient.signOut();
                 mAuth.signOut();
-                upload.setEnabled(false);
-                logIn.setEnabled(true);
-                download.setEnabled(false);
-                logOut.setEnabled(false);
+                loggedOut();
             }
         });
 
@@ -351,6 +362,13 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 resendVerificationCode(mAuth.getCurrentUser().getPhoneNumber(), mResendToken);
+            }
+        });
+
+        logInEmail.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                firebaseAuthWithEmailPwd(emailField.getText().toString(), pwdField.getText().toString());
             }
         });
     }
@@ -484,6 +502,27 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void firebaseAuthWithEmailPwd(String email, String password){
+        mAuth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            // Sign in success, update UI with the signed-in user's information
+                            Log.d(TAG, "signInWithEmail:success");
+                            FirebaseUser user = mAuth.getCurrentUser();
+                            loggedIn();
+                        } else {
+                            // If sign in fails, display a message to the user.
+                            Log.w(TAG, "signInWithEmail:failure", task.getException());
+                            fileOutput.setText("Invalid user");
+                        }
+
+                        // ...
+                    }
+                });
+    }
+
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
         Log.d(TAG, "firebaseAuthWithGoogle:" + acct.getId());
 
@@ -499,20 +538,23 @@ public class MainActivity extends Activity {
                                 mAuth.getCurrentUser().delete();
                                 mAuth.signOut();
                                 mAuth = FirebaseAuth.getInstance();
+                                fileOutput.setText("Invalid User");
                             }else{
                                 Log.d(TAG, "signInWithCredential:success");
                                 FirebaseUser user = mAuth.getCurrentUser();
                                 String phone = user.getPhoneNumber();
-                                if(phone.isEmpty()){
+                                loggedIn();
+                                /*if(phone.isEmpty()){
                                     fileOutput.setText("Phone not connected please enter valid phone to continue");
+                                    mAuth.logOut();
                                 }else{
                                     startPhoneNumberVerification(phone);
-                                }
+                                }*/
                             }
                         } else {
                             // If sign in fails, display a message to the user.
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
-                            Exception e = task.getException();
+                            fileOutput.setText("Invalid User");
                         }
                     }
                 });
