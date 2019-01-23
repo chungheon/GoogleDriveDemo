@@ -122,10 +122,8 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         FirebaseApp.initializeApp(this);
-        if (isReadStoragePermissionGranted() && isWriteStoragePermissionGranted()) {
-            initWork();
-            exqListener();
-        }
+        initWork();
+        exqListener();
     }
 
     @Override

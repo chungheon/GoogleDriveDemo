@@ -101,7 +101,7 @@ public class GroupSharing extends Activity {
         groupAddBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                rootRef.child("Groups").child("Group_" + numberOfGroups).child("users").child(MainActivity.mAuth.getCurrentUser().getUid()).setValue("a");
+                rootRef.child("Groups").child("Group_" + numberOfGroups).child("users").child(MainActivity.mAuth.getCurrentUser().getUid()).setValue("owner");
             }
         });
 
