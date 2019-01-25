@@ -1,6 +1,7 @@
 package com.example.ishan.googledrivedemo;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.MainThread;
@@ -12,6 +13,7 @@ import android.widget.TextView;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.api.services.drive.Drive;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -20,9 +22,13 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
+import org.w3c.dom.Text;
+
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -51,28 +57,35 @@ public class GroupSharing extends Activity {
     private UploadTask uploadTask;
     private TextView tv;
     private StorageReference fileRef;
+    private String fileExt;
     private long numberOfGroups;
     private Button groupAddBtn;
     private Button addBtn;
     private Button uploadFile;
-    private EditText groupNum;
+    private Button userGroup;
+    private TextView groupNum;
     private SecretKeySpec secret;
+    private String groupName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group_sharing);
+        initWork();
+        exqListener();
+    }
+
+    private void initWork(){
         rootRef = FirebaseDatabase.getInstance().getReference();
         rootRef.child("Groups");
         fbStore = FirebaseStorage.getInstance();
         tv = (TextView) findViewById(R.id.debug);
         groupAddBtn = (Button) findViewById(R.id.createGroup);
-        groupAddBtn.setEnabled(false);
         addBtn = (Button) findViewById(R.id.addUser);
         uploadFile = (Button) findViewById(R.id.fileUpload);
-        groupNum = (EditText) findViewById(R.id.groupNumber);
-        calculateGroup();
-        exqListener();
+        groupNum = (TextView) findViewById(R.id.displayID);
+        userGroup = (Button) findViewById(R.id.viewGroups);
+        addBtn.setVisibility(View.GONE);
 
         byte[] ivBytes;
         String password="Hello";
@@ -95,20 +108,26 @@ public class GroupSharing extends Activity {
             e.printStackTrace();
         }
         secret = new SecretKeySpec(secretKey.getEncoded(), "AES");
+
+
     }
 
-    public void exqListener(){
+    private void exqListener(){
         groupAddBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                rootRef.child("Groups").child("Group_" + numberOfGroups).child("users").child(MainActivity.mAuth.getCurrentUser().getUid()).setValue("owner");
+                startCreateGroupActivity();
             }
         });
 
         addBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();
+                File localFile = new File(baseDir + "/Encrypted.mp4");
+                File decrypted = new File(baseDir + "/Decrypted.mp4");
 
+                decryptFile(localFile, decrypted);
             }
         });
 
@@ -118,33 +137,33 @@ public class GroupSharing extends Activity {
                 selectFile();
             }
         });
-    }
 
-    public void calculateGroup(){
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference().child("Groups");
-        ref.addValueEventListener(new ValueEventListener() {
+        userGroup.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                    numberOfGroups = dataSnapshot.getChildrenCount();
-                    tv.setText("Number of groups: " + numberOfGroups);
-                    groupAddBtn.setEnabled(true);
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                tv.setText("Unable to access");
+            public void onClick(View v) {
+                startGroupChoosingActivity();
             }
         });
-
     }
 
-    public void selectFile(){
+    private void startCreateGroupActivity(){
+        Intent intent = new Intent(this, CreateGroup.class);
+        startActivity(intent);
+    }
+
+    private void startGroupChoosingActivity(){
+        Intent intent = new Intent(this, GroupChooser.class);
+        startActivity(intent);
+    }
+
+    private void selectFile(){
         FileChooser fileChooser = new FileChooser(this);
 
         fileChooser.setFileListener(new FileChooser.FileSelectedListener() {
             @Override
             public void fileSelected(final File file) {
                 String fileExtension = getFileExtension(file.getPath());
+                fileExt = fileExtension;
                 fileRef = fbStore.getReference().child("test." + fileExtension);
                 File encrypted = new File(file.getParent() + "/Encrypt." + fileExtension);
                 encryptFile(file, encrypted);
@@ -155,22 +174,39 @@ public class GroupSharing extends Activity {
     }
 
 
-    public void downloadFile(){
+    private void downloadFile(){
 
         String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();
-         File localFile = new File(baseDir + "/Encrypted.jpg");
-         File decrypted = new File(baseDir + "/Decrypted.jpg");
+
+        fileRef.getMetadata().addOnSuccessListener(new OnSuccessListener<StorageMetadata>() {
+            @Override
+            public void onSuccess(StorageMetadata storageMetadata) {
+                fileExt= storageMetadata.getContentType();
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                // Uh-oh, an error occurred!
+            }
+        });
+
+        File localFile = new File(baseDir + "/Encrypted." + fileExt);
+        File decrypted = new File(baseDir + "/Decrypted." + fileExt);
 
         fileRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
             @Override
             public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
                 // Local temp file has been created
                 decryptFile(localFile, decrypted);
+                tv.setText("Downloaded file");
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
                 // Handle any errors
+                localFile.delete();
+                decrypted.delete();
+                tv.setText("Failed to download");
             }
         });
     }
@@ -181,6 +217,7 @@ public class GroupSharing extends Activity {
             FileInputStream inputStream = new FileInputStream(encrypted);
             byte[] inputBytes = new byte[(int) encrypted.length()];
             inputStream.read(inputBytes);
+
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.DECRYPT_MODE, secret);
 
@@ -188,22 +225,26 @@ public class GroupSharing extends Activity {
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
             outputStream.write(inputBytes);
 
+            tv.setText("File decrypted");
+
             inputStream.close();
             outputStream.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
-        } catch (IOException e) {
+        } catch (IOException | InvalidKeyException e) {
             e.printStackTrace();
+            decrypted.delete();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
+            decrypted.delete();
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
+        }finally {
+            //encrypted.delete();
         }
     }
 
-    public void encryptFile(File file, File encrypted) {
+    private void encryptFile(File file, File encrypted) {
         try {
             FileInputStream inputStream = new FileInputStream(file);
             byte[] inputBytes = new byte[(int) file.length()];
@@ -213,7 +254,16 @@ public class GroupSharing extends Activity {
             cipher.init(Cipher.ENCRYPT_MODE, secret);
             FileOutputStream os = new FileOutputStream(encrypted);
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
+
             outputStream.write(inputBytes);
+            /*byte[] input = new byte[64000];
+
+            int bytesRead;
+            while ((bytesRead = inputStream.read(input, 0, 64000)) != -1)
+            {
+                byte[] output = cipher.update(input, 0, bytesRead);
+                if (output != null) outputStream.write(output);
+            }*/
 
             inputStream.close();
             outputStream.close();
@@ -224,7 +274,7 @@ public class GroupSharing extends Activity {
         }
     }
 
-    public void uploadFile(File file){
+    private void uploadFile(File file){
         InputStream stream = null;
         try {
             stream = new FileInputStream(file);
@@ -232,12 +282,17 @@ public class GroupSharing extends Activity {
             e.printStackTrace();
         }
 
-        uploadTask = fileRef.putStream(stream);
+        StorageMetadata metadata = new StorageMetadata.Builder()
+                .setContentType(fileExt)
+                .build();
+
+        uploadTask = fileRef.putStream(stream, metadata);
         uploadTask.addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
                 // Handle unsuccessful uploads
                 tv.setText("Failure");
+                file.delete();
             }
         }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
             @Override
@@ -246,6 +301,7 @@ public class GroupSharing extends Activity {
                 // ...
 
                 tv.setText("Success");
+                file.delete();
                 downloadFile();
             }
         });

@@ -21,7 +21,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".GroupSharing"></activity>
+        <activity android:name=".GroupSharing" />
+        <activity android:name=".CreateGroup" />
+        <activity android:name=".GroupChooser"></activity>
     </application>
 
 </manifest>

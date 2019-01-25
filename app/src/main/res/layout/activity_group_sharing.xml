@@ -12,25 +12,34 @@
         android:layout_height="wrap_content"
         android:id="@+id/debug"
         android:text="debug message"/>
+
     <Button
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/createGroup"
         android:text="Create Group"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/viewGroups"
+        android:text="View user groups"/>
+
     <Button
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/addUser"
         android:text="Add"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/displayID"/>
+
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/fileUpload"
         android:text="Upload File"/>
-    <EditText
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:id="@+id/groupNumber"/>
 
 
 </LinearLayout>

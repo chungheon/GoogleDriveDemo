@@ -113,6 +113,7 @@ public class MainActivity extends Activity {
     private boolean doubleBackToExitPressedOnce = false;
 
     private boolean mVerificationInProgress = false;
+    private boolean mLinkInProgress = false;
     private String mVerificationId;
     private PhoneAuthProvider.ForceResendingToken mResendToken;
     private PhoneAuthProvider.OnVerificationStateChangedCallbacks mCallbacks;
@@ -124,6 +125,7 @@ public class MainActivity extends Activity {
         FirebaseApp.initializeApp(this);
         initWork();
         exqListener();
+        if(isReadStoragePermissionGranted() && isWriteStoragePermissionGranted()){ }
     }
 
     @Override
@@ -206,6 +208,7 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "onVerificationCompleted:" + credential);
                 // [START_EXCLUDE silent]
                 mVerificationInProgress = false;
+                mLinkInProgress = false;
                 // [END_EXCLUDE]
             }
 
@@ -216,6 +219,7 @@ public class MainActivity extends Activity {
                 Log.w(TAG, "onVerificationFailed", e);
                 // [START_EXCLUDE silent]
                 mVerificationInProgress = false;
+                mLinkInProgress = false;
                 // [END_EXCLUDE]
 
                 if (e instanceof FirebaseAuthInvalidCredentialsException) {
@@ -250,16 +254,19 @@ public class MainActivity extends Activity {
                 codeField.setVisibility(View.VISIBLE);
                 sendCode.setVisibility(View.VISIBLE);
                 resendCode.setVisibility(View.VISIBLE);
+                emailField.setVisibility(View.GONE);
+                pwdField.setVisibility(View.GONE);
             }
         };
         // [END phone_auth_callbacks]
     }
 
     private void startPhoneNumberVerification(String phoneNumber) {
+        codeField.setText("");
         // [START start_phone_auth]
         PhoneAuthProvider.getInstance().verifyPhoneNumber(
                 phoneNumber,        // Phone number to verify
-                15,                 // Timeout duration
+                30,                 // Timeout duration
                 TimeUnit.SECONDS,   // Unit of timeout
                 this,               // Activity (for callback binding)
                 mCallbacks);        // OnVerificationStateChangedCallbacks
@@ -268,10 +275,36 @@ public class MainActivity extends Activity {
         mVerificationInProgress = true;
     }
 
-    private void verifyPhoneNumberWithCode(String verificationId, String code) {
+    private void linkPhoneNumberWithCode(String verificationId, String code){
         // [START verify_with_code]
         PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationId, code);
         // [END verify_with_code]
+
+        mAuth.getCurrentUser().linkWithCredential(credential)
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            Log.d(TAG, "linkWithCredential:success");
+                            fileOutput.setText("Linked success");
+                            FirebaseUser user = task.getResult().getUser();
+                            loggedIn();
+                        } else {
+                            Log.w(TAG, "linkWithCredential:failure", task.getException());
+                            Toast.makeText(MainActivity.this, "Failed to link",
+                                    Toast.LENGTH_SHORT).show();
+                            loggedIn();
+                            download.setVisibility(View.VISIBLE);
+                        }
+
+                        // ...
+                    }
+                });
+    }
+
+    private void verifyPhoneNumberWithCode(String verificationId, String code) {
+        PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationId, code);
+
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                     @Override
@@ -297,7 +330,6 @@ public class MainActivity extends Activity {
         pwdField.setVisibility(View.GONE);
         logOut.setEnabled(true);
         upload.setEnabled(true);
-        download.setEnabled(true);
         codeField.setVisibility(View.GONE);
         sendCode.setVisibility(View.GONE);
         resendCode.setVisibility(View.GONE);
@@ -315,11 +347,25 @@ public class MainActivity extends Activity {
         fileOutput.setText("Logged Out");
     }
 
+    private void linkPhone(){
+        logIn.setVisibility(View.GONE);
+        logInEmail.setVisibility(View.GONE);
+        emailField.setText("");
+        emailField.setVisibility(View.GONE);
+        pwdField.setText("");
+        pwdField.setVisibility(View.GONE);
+        sendCode.setVisibility(View.GONE);
+        resendCode.setVisibility(View.GONE);
+        logOut.setVisibility(View.GONE);
+        upload.setVisibility(View.GONE);
+        download.setVisibility(View.GONE);
+    }
+
     private void resendVerificationCode(String phoneNumber,
                                         PhoneAuthProvider.ForceResendingToken token) {
         PhoneAuthProvider.getInstance().verifyPhoneNumber(
                 phoneNumber,        // Phone number to verify
-                15,                 // Timeout duration
+                30,                 // Timeout duration
                 TimeUnit.SECONDS,   // Unit of timeout
                 this,               // Activity (for callback binding)
                 mCallbacks,         // OnVerificationStateChangedCallbacks
@@ -358,7 +404,17 @@ public class MainActivity extends Activity {
         download.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                pickTextFile();
+                mLinkInProgress = true;
+                codeField.setVisibility(View.VISIBLE);
+                linkPhone();
+                String newPhone = codeField.getText().toString();
+                if(isNullOrEmpty(newPhone)){
+                    fileOutput.setText("Please enter a phone number");
+                    download.setVisibility(View.VISIBLE);
+                }else{
+                    startPhoneNumberVerification(newPhone);
+                }
+
             }
         });
 
@@ -374,7 +430,11 @@ public class MainActivity extends Activity {
         sendCode.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                verifyPhoneNumberWithCode(mVerificationId, codeField.getText().toString());
+                if(mLinkInProgress){
+                    linkPhoneNumberWithCode(mVerificationId, codeField.getText().toString());
+                }else{
+                    verifyPhoneNumberWithCode(mVerificationId, codeField.getText().toString());
+                }
             }
         });
 
@@ -388,7 +448,11 @@ public class MainActivity extends Activity {
         logInEmail.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                firebaseAuthWithEmailPwd(emailField.getText().toString(), pwdField.getText().toString());
+                if(isNullOrEmpty(emailField.getText().toString()) || isNullOrEmpty(pwdField.getText().toString())) {
+                    fileOutput.setText("Please enter your acct and password");
+                }else{
+                    firebaseAuthWithEmailPwd(emailField.getText().toString(), pwdField.getText().toString());
+                }
             }
         });
     }
@@ -415,23 +479,6 @@ public class MainActivity extends Activity {
     }
 
 
-    private void uploadFile() {
-        FileChooser fileChooser = new FileChooser(this);
-
-        fileChooser.setFileListener(new FileChooser.FileSelectedListener() {
-            @Override
-            public void fileSelected(final File file) {
-                String fileExtension = getFileExtension(file.getPath());
-                if (fileExtension != null) {
-                    File encrypted = new File(file.getParent() + "/Encrypt." + fileExtension);
-                    encryptFile(file, encrypted);
-                    saveFileToDrive(encrypted, fileExtension);
-                }
-            }
-        });
-        fileChooser.showDialog();
-    }
-
     private static String getFileExtension(String fullName) {
         if (isNullOrEmpty(fullName)) {
             return null;
@@ -447,79 +494,11 @@ public class MainActivity extends Activity {
         return true;
     }
 
-    public void encryptFile(File file, File encrypted) {
-        try {
-            FileInputStream inputStream = new FileInputStream(file);
-            byte[] inputBytes = new byte[(int) file.length()];
-            inputStream.read(inputBytes);
+    private boolean editTextIsEmpty(EditText etText) {
+        if (etText.getText().toString().trim().length() > 0)
+            return false;
 
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.ENCRYPT_MODE, this.secret);
-            FileOutputStream os = new FileOutputStream(encrypted);
-            CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
-            outputStream.write(inputBytes);
-
-            inputStream.close();
-            outputStream.close();
-        } catch (InvalidKeyException e) {
-            fileOutput.setText("InvalidKey");
-        } catch (NoSuchAlgorithmException e) {
-            fileOutput.setText("NoSuchAlgorithm");
-        } catch (NoSuchPaddingException e) {
-            fileOutput.setText("NoSuchPadding");
-        } catch (IOException e) {
-            fileOutput.setText("IOException");
-        }
-    }
-
-    private void decryptFile(File encrypted, File decrypted) {
-        try {
-            FileInputStream inputStream = new FileInputStream(encrypted);
-            byte[] inputBytes = new byte[(int) encrypted.length()];
-            inputStream.read(inputBytes);
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.DECRYPT_MODE, secret);
-
-            FileOutputStream os = new FileOutputStream(decrypted);
-            CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
-            outputStream.write(inputBytes);
-
-            inputStream.close();
-            outputStream.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void decryptFile(byte[] encrypted, File decrypted) {
-        try {
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.DECRYPT_MODE, secret);
-
-            FileOutputStream os = new FileOutputStream(decrypted);
-            CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
-            outputStream.write(encrypted);
-
-            outputStream.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        }
+        return true;
     }
 
     private void firebaseAuthWithEmailPwd(String email, String password){
@@ -531,7 +510,13 @@ public class MainActivity extends Activity {
                             // Sign in success, update UI with the signed-in user's information
                             Log.d(TAG, "signInWithEmail:success");
                             FirebaseUser user = mAuth.getCurrentUser();
-                            loggedIn();
+                            String phone = user.getPhoneNumber();
+                            if(isNullOrEmpty(phone)){
+                                loggedIn();
+                                download.setEnabled(true);
+                            }else{
+                                startPhoneNumberVerification(phone);
+                            }
                         } else {
                             // If sign in fails, display a message to the user.
                             Log.w(TAG, "signInWithEmail:failure", task.getException());
@@ -553,24 +538,24 @@ public class MainActivity extends Activity {
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
                             AuthResult a = task.getResult();
-                            boolean newUser = a.getAdditionalUserInfo().isNewUser();
+                            /*boolean newUser = a.getAdditionalUserInfo().isNewUser();
                             if(newUser){
                                 mAuth.getCurrentUser().delete();
                                 mAuth.signOut();
                                 mAuth = FirebaseAuth.getInstance();
                                 fileOutput.setText("Invalid User");
-                            }else{
+                            }else{*/
                                 Log.d(TAG, "signInWithCredential:success");
                                 FirebaseUser user = mAuth.getCurrentUser();
                                 String phone = user.getPhoneNumber();
-                                loggedIn();
-                                /*if(phone.isEmpty()){
-                                    fileOutput.setText("Phone not connected please enter valid phone to continue");
-                                    mAuth.logOut();
+                                //loggedIn();
+                                if(isNullOrEmpty(phone)){
+                                    loggedIn();
+                                    download.setEnabled(true);
                                 }else{
                                     startPhoneNumberVerification(phone);
-                                }*/
-                            }
+                                }
+                            //}
                         } else {
                             // If sign in fails, display a message to the user.
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
@@ -580,134 +565,7 @@ public class MainActivity extends Activity {
                 });
     }
 
-    private void saveFileToDrive(File file, String ext) {
-        // Start by creating a new contents, and setting a callback.
-        Log.i(TAG, "Creating new contents.");
 
-        mDriveResourceClient
-                .createContents()
-                .continueWithTask(
-                        task -> createFileIntentSender(task.getResult(), file, ext))
-                .addOnFailureListener(
-                        e -> Log.w(TAG, "Failed to create new contents.", e));
-    }
-
-
-
-    private Task<Void> createFileIntentSender(DriveContents driveContents, File file, String ext) {
-        Log.i(TAG, "New contents created.");
-        // Get an output stream for the contents.
-        OutputStream outputStream = driveContents.getOutputStream();
-
-        try {
-            InputStream is = new FileInputStream(file);
-            byte fileByteArray[] = new byte[(int) file.length()];
-            while (is.read(fileByteArray) != -1) {
-                outputStream.write(fileByteArray);
-            }
-            file.delete();
-        } catch (IOException e) {
-            Log.w(TAG, "Unable to write file contents.", e);
-        }
-
-        // Create the initial metadata - MIME type and title.
-        // Note that the user will be able to change the title later.
-        MetadataChangeSet metadataChangeSet =
-                new MetadataChangeSet.Builder()
-                        .setMimeType("*/*")
-                        .setTitle("Encrypt." + ext)
-                        .build();
-        // Set up options to configure and display the create file activity.
-        CreateFileActivityOptions createFileActivityOptions =
-                new CreateFileActivityOptions.Builder()
-                        .setInitialMetadata(metadataChangeSet)
-                        .setInitialDriveContents(driveContents)
-                        .build();
-
-        return mDriveClient
-                .newCreateFileActivityIntentSender(createFileActivityOptions)
-                .continueWith(
-                        task -> {
-                            startIntentSenderForResult(task.getResult(), REQUEST_CODE_CREATOR, null, 0, 0, 0);
-                            return null;
-                        });
-    }
-
-    protected Task<DriveId> pickTextFile() {
-        OpenFileActivityOptions openOptions =
-                new OpenFileActivityOptions.Builder()
-                        .setSelectionFilter(Filters.eq(SearchableField.MIME_TYPE, "*/*"))
-                        .setActivityTitle("decrypted")
-                        .build();
-        return pickItem(openOptions);
-    }
-
-    private Task<DriveId> pickItem(OpenFileActivityOptions openOptions) {
-        mOpenItemTaskSource = new TaskCompletionSource<>();
-        mDriveClient.newOpenFileActivityIntentSender(openOptions)
-                .continueWith((Continuation<IntentSender, Void>) task -> {
-                    startIntentSenderForResult(
-                            task.getResult(), REQUEST_CODE_OPEN_ITEM, null, 0, 0, 0);
-                    return null;
-                });
-        return mOpenItemTaskSource.getTask();
-    }
-
-    private void retrieveMetadata(final DriveFile file) {
-        Task<Metadata> getMetadataTask = mDriveResourceClient.getMetadata(file);
-        getMetadataTask
-                .addOnSuccessListener(this,
-                        metadata -> {
-                            retrieveExt = getFileExtension(metadata.getTitle());
-                        })
-                .addOnFailureListener(this, e -> {
-                    Log.e(TAG, "Unable to retrieve metadata", e);
-                });
-    }
-
-    private void retrieveContents(DriveFile file) {
-        // [START drive_android_open_file]
-        Task<DriveContents> openFileTask =
-                mDriveResourceClient.openFile(file, DriveFile.MODE_READ_ONLY);
-        // [END drive_android_open_file]
-        // [START drive_android_read_contents]
-        openFileTask
-                .continueWithTask(task -> {
-                    DriveContents contents = task.getResult();
-                    InputStream is = contents.getInputStream();
-                    ByteArrayOutputStream os = new ByteArrayOutputStream();
-                    byte[] buffer = new byte[1024];
-                    int len;
-
-                    while ((len = is.read(buffer)) != -1) {
-                        os.write(buffer, 0, len);
-                    }
-
-                    byte bytes[] = os.toByteArray();
-                    String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();
-
-                    /*try (FileOutputStream stream = new FileOutputStream(baseDir + "/Encrypt." + retrieveExt)) {
-                        stream.write(bytes);
-                    }
-
-                    File encrypt = new File(baseDir + "/Encrypt." + retrieveExt);*/
-                    File decrypt = new File(baseDir + "/Decrypt." + retrieveExt);
-                    decryptFile(bytes, decrypt);
-
-                    fileOutput.setText("File saved as " + baseDir + "/Decrypt." + retrieveExt);
-
-                    Task<Void> discardTask = mDriveResourceClient.discardContents(contents);
-                    // [END drive_android_discard_contents]
-                    return discardTask;
-                })
-                .addOnFailureListener(e -> {
-                    // Handle failure
-                    // [START_EXCLUDE]
-                    Log.e(TAG, "Unable to read contents", e);
-
-                    // [END_EXCLUDE]
-                });
-    }
 
     @Override
     protected void onActivityResult(final int requestCode, final int resultCode, final Intent data) {
@@ -732,26 +590,6 @@ public class MainActivity extends Activity {
                     }
                 } else {
                     fileOutput.setText("Failed to sign in");
-                }
-                break;
-            case REQUEST_CODE_CREATOR:
-                Log.i(TAG, "creator request code");
-                // Called after a file is saved to Drive.
-                if (resultCode == RESULT_OK) {
-                    fileOutput.setText("Upload successful");
-                } else {
-                    fileOutput.setText("Upload unsuccessful");
-                }
-                break;
-            case REQUEST_CODE_OPEN_ITEM:
-                if (resultCode == RESULT_OK) {
-                    DriveId driveId = data.getParcelableExtra(
-                            OpenFileActivityOptions.EXTRA_RESPONSE_DRIVE_ID);
-                    mOpenItemTaskSource.setResult(driveId);
-                    retrieveMetadata(driveId.asDriveFile());
-                    retrieveContents(driveId.asDriveFile());
-                } else {
-                    mOpenItemTaskSource.setException(new RuntimeException("Unable to open file"));
                 }
                 break;
         }
