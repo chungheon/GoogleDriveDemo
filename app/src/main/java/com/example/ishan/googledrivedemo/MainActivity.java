@@ -316,6 +316,7 @@ public class MainActivity extends Activity {
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
                             fileOutput.setText("Invalid Code");
+                            loggedOut();
                         }
                     }
                 });
@@ -333,7 +334,6 @@ public class MainActivity extends Activity {
         codeField.setVisibility(View.GONE);
         sendCode.setVisibility(View.GONE);
         resendCode.setVisibility(View.GONE);
-        fileOutput.setText("Signed In");
     }
 
     private void loggedOut(){
@@ -344,7 +344,6 @@ public class MainActivity extends Activity {
         logOut.setEnabled(false);
         upload.setEnabled(false);
         download.setEnabled(false);
-        fileOutput.setText("Logged Out");
     }
 
     private void linkPhone(){
@@ -513,6 +512,8 @@ public class MainActivity extends Activity {
                             String phone = user.getPhoneNumber();
                             if(isNullOrEmpty(phone)){
                                 loggedIn();
+                                fileOutput.setText("Logged In");
+                                mLinkInProgress = true;
                                 download.setEnabled(true);
                             }else{
                                 startPhoneNumberVerification(phone);
@@ -551,6 +552,8 @@ public class MainActivity extends Activity {
                                 //loggedIn();
                                 if(isNullOrEmpty(phone)){
                                     loggedIn();
+                                    fileOutput.setText("Logged In");
+                                    mLinkInProgress = true;
                                     download.setEnabled(true);
                                 }else{
                                     startPhoneNumberVerification(phone);
