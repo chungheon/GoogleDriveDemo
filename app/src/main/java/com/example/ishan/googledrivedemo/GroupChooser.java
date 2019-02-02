@@ -1,12 +1,17 @@
 package com.example.ishan.googledrivedemo;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -14,9 +19,11 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class GroupChooser extends Activity {
@@ -24,6 +31,7 @@ public class GroupChooser extends Activity {
     private ArrayList<String> list_of_groups = new ArrayList<>();
     private DatabaseReference rootRef;
     private ListView groupsList;
+    private FirebaseUser current;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,6 +39,7 @@ public class GroupChooser extends Activity {
         setContentView(R.layout.activity_group_chooser);
         rootRef = FirebaseDatabase.getInstance().getReference();
         groupsList = (ListView) findViewById(R.id.group_list);
+        current = MainActivity.mAuth.getCurrentUser();
         RetrieveAndDisplayGroups();
 
     }
@@ -56,6 +65,14 @@ public class GroupChooser extends Activity {
                     list_of_groups.addAll(set);
                     ArrayAdapter<String> itemsAdapter;
                     itemsAdapter = new ArrayAdapter<String>(GroupChooser.this, android.R.layout.simple_list_item_1, list_of_groups);
+                    groupsList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
+                        @Override
+                        public void onItemClick(AdapterView<?> a, View v, int position,
+                                                long id) {
+                            startFileTransferActivity(list_of_groups.get(position));
+                        }
+                    });
                     groupsList.setAdapter(itemsAdapter);
                 }
             }
@@ -66,5 +83,11 @@ public class GroupChooser extends Activity {
                 GroupChooser.super.onBackPressed();
             }
         });
+    }
+
+    private void startFileTransferActivity(String groupName){
+        Intent intent = new Intent(this, GroupSharing.class);
+        intent.putExtra("group", groupName);
+        startActivity(intent);
     }
 }

@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -52,6 +53,7 @@ import static com.google.common.io.Files.getFileExtension;
 
 public class GroupSharing extends Activity {
 
+    private final String TAG = "GroupSharing";
     private DatabaseReference rootRef;
     private FirebaseStorage fbStore;
     private UploadTask uploadTask;
@@ -63,14 +65,21 @@ public class GroupSharing extends Activity {
     private Button addBtn;
     private Button uploadFile;
     private Button userGroup;
+    private Button downloadFile;
     private TextView groupNum;
     private SecretKeySpec secret;
     private String groupName;
+    private boolean groupSelected = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group_sharing);
+        Intent intent = getIntent();
+        groupName = intent.getStringExtra("group");
+        if(!groupName.equals("Group Not Selected")){
+            groupSelected = true;
+        }
         initWork();
         exqListener();
     }
@@ -85,7 +94,9 @@ public class GroupSharing extends Activity {
         uploadFile = (Button) findViewById(R.id.fileUpload);
         groupNum = (TextView) findViewById(R.id.displayID);
         userGroup = (Button) findViewById(R.id.viewGroups);
+        downloadFile = (Button) findViewById(R.id.fileDownload);
         addBtn.setVisibility(View.GONE);
+        tv.setText(groupName);
 
         byte[] ivBytes;
         String password="Hello";
@@ -123,18 +134,29 @@ public class GroupSharing extends Activity {
         addBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String baseDir = Environment.getExternalStorageDirectory().getAbsolutePath();
-                File localFile = new File(baseDir + "/Encrypted.mp4");
-                File decrypted = new File(baseDir + "/Decrypted.mp4");
 
-                decryptFile(localFile, decrypted);
             }
         });
 
         uploadFile.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                selectFile();
+                if(groupSelected){
+                    selectFile();
+                }else{
+                    Toast.makeText(GroupSharing.this, "Please select a group first", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        downloadFile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(groupSelected){
+                    selectDownloadFile();
+                }else{
+                    Toast.makeText(GroupSharing.this, "Please select a group first", Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
@@ -165,9 +187,24 @@ public class GroupSharing extends Activity {
                 String fileExtension = getFileExtension(file.getPath());
                 fileExt = fileExtension;
                 fileRef = fbStore.getReference().child("test." + fileExtension);
-                File encrypted = new File(file.getParent() + "/Encrypt." + fileExtension);
+                File encrypted = new File(file.getParent() +  "test");
                 encryptFile(file, encrypted);
                 uploadFile(encrypted);
+            }
+        });
+        fileChooser.showDialog();
+    }
+
+    private void selectDownloadFile(){
+        FirebaseFileChooser fileChooser = new FirebaseFileChooser(this, MainActivity.mAuth.getCurrentUser().getUid().toString(), groupName);
+
+        fileChooser.setFileListener(new FirebaseFileChooser.FileSelectedListener() {
+            @Override
+            public void fileSelected(final String fileName) {
+                String fileExtension = getFileExtension(fileName);
+                fileExt = fileExtension;
+                fileRef = fbStore.getReference().child(MainActivity.mAuth.getCurrentUser().getUid().toString()).child(fileName);
+                downloadFile();
             }
         });
         fileChooser.showDialog();
@@ -281,7 +318,8 @@ public class GroupSharing extends Activity {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-
+        //String[] fileInfo = file.getName().split(".");
+        rootRef.child("storage").child("groups").child(groupName).child(MainActivity.mAuth.getCurrentUser().getUid().toString()).child(file.getName()).setValue("");
         StorageMetadata metadata = new StorageMetadata.Builder()
                 .setContentType(fileExt)
                 .build();
@@ -302,7 +340,6 @@ public class GroupSharing extends Activity {
 
                 tv.setText("Success");
                 file.delete();
-                downloadFile();
             }
         });
     }

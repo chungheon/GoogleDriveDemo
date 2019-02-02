@@ -396,6 +396,7 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 //uploadFile();
                 Intent intent = new Intent(MainActivity.this, GroupSharing.class);
+                intent.putExtra("group", "Group Not Selected");
                 startActivity(intent);
             }
         });
