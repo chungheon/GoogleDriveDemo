@@ -297,6 +297,7 @@ public class MainActivity extends Activity {
                             fileOutput.setText("Linked success");
                             FirebaseUser user = task.getResult().getUser();
                             loggedIn();
+                            userLoggedIn();
                         } else {
                             Log.w(TAG, "linkWithCredential:failure", task.getException());
                             Toast.makeText(MainActivity.this, "Failed to link",
@@ -643,6 +644,7 @@ public class MainActivity extends Activity {
                                     fileOutput.setText("Logged In");
                                     mLinkInProgress = true;
                                     download.setEnabled(true);
+                                    userLoggedIn();
                                 }else{
                                     startPhoneNumberVerification(phone);
                                 }
