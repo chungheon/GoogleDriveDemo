@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.MainThread;
 import android.support.annotation.NonNull;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -37,9 +38,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.InvalidKeyException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.UnrecoverableEntryException;
+import java.security.cert.Certificate;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Enumeration;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
@@ -186,10 +192,11 @@ public class GroupSharing extends Activity {
             public void fileSelected(final File file) {
                 String fileExtension = getFileExtension(file.getPath());
                 fileExt = fileExtension;
-                fileRef = fbStore.getReference().child("test." + fileExtension);
-                File encrypted = new File(file.getParent() +  "test");
+                String fileName = getFileName(file);
+                fileRef = fbStore.getReference().child(MainActivity.mAuth.getCurrentUser().getUid().toString()).child(fileName);
+                File encrypted = new File(file.getParent() +  "/UPLOADFILE");
                 encryptFile(file, encrypted);
-                uploadFile(encrypted);
+                uploadFile(encrypted, fileName);
             }
         });
         fileChooser.showDialog();
@@ -210,6 +217,11 @@ public class GroupSharing extends Activity {
         fileChooser.showDialog();
     }
 
+    private String getFileName(File file){
+        String[] fileName = file.getName().split("\\.");
+        return fileName[0];
+    }
+
 
     private void downloadFile(){
 
@@ -218,7 +230,28 @@ public class GroupSharing extends Activity {
         fileRef.getMetadata().addOnSuccessListener(new OnSuccessListener<StorageMetadata>() {
             @Override
             public void onSuccess(StorageMetadata storageMetadata) {
-                fileExt= storageMetadata.getContentType();
+                fileExt = storageMetadata.getContentType();
+
+                File localFile = new File(baseDir + "/Encrypted." + fileExt);
+                File decrypted = new File(baseDir + "/Decrypted." + fileExt);
+
+                fileRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+                        // Local temp file has been created
+                        decryptFile(localFile, decrypted);
+                        localFile.delete();
+                        tv.setText("Downloaded file");
+                    }
+                }).addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        // Handle any errors
+                        localFile.delete();
+                        decrypted.delete();
+                        tv.setText("Failed to download");
+                    }
+                });
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
@@ -227,25 +260,7 @@ public class GroupSharing extends Activity {
             }
         });
 
-        File localFile = new File(baseDir + "/Encrypted." + fileExt);
-        File decrypted = new File(baseDir + "/Decrypted." + fileExt);
 
-        fileRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
-            @Override
-            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
-                // Local temp file has been created
-                decryptFile(localFile, decrypted);
-                tv.setText("Downloaded file");
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                // Handle any errors
-                localFile.delete();
-                decrypted.delete();
-                tv.setText("Failed to download");
-            }
-        });
     }
 
 
@@ -311,15 +326,14 @@ public class GroupSharing extends Activity {
         }
     }
 
-    private void uploadFile(File file){
+    private void uploadFile(File file, String fileName){
         InputStream stream = null;
         try {
             stream = new FileInputStream(file);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-        //String[] fileInfo = file.getName().split(".");
-        rootRef.child("storage").child("groups").child(groupName).child(MainActivity.mAuth.getCurrentUser().getUid().toString()).child(file.getName()).setValue("");
+        rootRef.child("storage").child("groups").child(groupName).child(MainActivity.mAuth.getCurrentUser().getUid().toString()).child(fileName).setValue("");
         StorageMetadata metadata = new StorageMetadata.Builder()
                 .setContentType(fileExt)
                 .build();

@@ -1,36 +1,75 @@
 package com.example.ishan.googledrivedemo;
 
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.PrivateKey;
+import java.security.Provider;
 import java.security.PublicKey;
+import java.security.Security;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Calendar;
 import java.util.Date;
 
 import javax.security.auth.x500.X500Principal;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 public class SelfSignedCertificateGeneration {
 
-    public X509Certificate selfSignedCertificate(KeyPair keyPair, String serialNumber, String hostName)
-            throws GeneralSecurityException {
+    public static Certificate selfSign(KeyPair keyPair, String subjectDN)
+            throws OperatorCreationException, CertificateException, IOException
+    {
+        Provider bcProvider = new BouncyCastleProvider();
+        Security.addProvider(bcProvider);
 
-        Date from = new Date();
-        Date to = new Date(from.getTime() + 365 * 86400000l);
+        long now = System.currentTimeMillis();
+        Date startDate = new Date(now);
 
-        X509V3CertificateGenerator generator = new X509V3CertificateGenerator();
-        X500Principal issuer = new X500Principal("CN=" + hostName);
-        X500Principal subject = new X500Principal("CN=" + hostName);
-        generator.setSerialNumber(new BigInteger(serialNumber));
-        generator.setIssuerDN(issuer);
-        generator.setNotBefore(from);
-        generator.setNotAfter(to);
-        generator.setSubjectDN(subject);
-        generator.setPublicKey(keyPair.getPublic());
-        generator.setSignatureAlgorithm("SHA256WithRSAEncryption");
-        return generator.generateX509Certificate(keyPair.getPrivate(), "BC");
+        X500Name dnName = new X500Name(subjectDN);
+
+        // Using the current timestamp as the certificate serial number
+        BigInteger certSerialNumber = new BigInteger(Long.toString(now));
+
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(startDate);
+        // 1 Yr validity
+        calendar.add(Calendar.YEAR, 1);
+
+        Date endDate = calendar.getTime();
+
+        // Use appropriate signature algorithm based on your keyPair algorithm.
+        String signatureAlgorithm = "SHA256WithRSA";
+
+        SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfo.getInstance(keyPair
+                .getPublic().getEncoded());
+
+                certSerialNumber, startDate, endDate, dnName, subjectPublicKeyInfo);
+
+        ContentSigner contentSigner = new JcaContentSignerBuilder(signatureAlgorithm).setProvider(
+                bcProvider).build(keyPair.getPrivate());
+
+        X509CertificateHolder certificateHolder = certificateBuilder.build(contentSigner);
+
+        Certificate selfSignedCert = new JcaX509CertificateConverter()
+                .getCertificate(certificateHolder);
+
+        return selfSignedCert;
     }
 
 }
