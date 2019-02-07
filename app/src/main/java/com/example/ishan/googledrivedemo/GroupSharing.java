@@ -108,7 +108,8 @@ public class GroupSharing extends Activity {
         String password="Hello";
         /*you can give whatever you want for password. This is for testing purpose*/
         SecureRandom random = new SecureRandom();
-        byte bytes[] = {1,1,1,1,1,1};
+        byte bytes[] = new byte[6];
+        random.nextBytes(bytes);
         byte[] saltBytes = bytes;
         // Derive the key
         SecretKeyFactory factory = null;
@@ -239,7 +240,7 @@ public class GroupSharing extends Activity {
                     @Override
                     public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
                         // Local temp file has been created
-                        decryptFile(localFile, decrypted);
+                        decryptFile(localFile, decrypted, secret);
                         localFile.delete();
                         tv.setText("Downloaded file");
                     }
@@ -264,14 +265,14 @@ public class GroupSharing extends Activity {
     }
 
 
-    private void decryptFile(File encrypted, File decrypted) {
+    private void decryptFile(File encrypted, File decrypted, SecretKey secretKey) {
         try {
             FileInputStream inputStream = new FileInputStream(encrypted);
             byte[] inputBytes = new byte[(int) encrypted.length()];
             inputStream.read(inputBytes);
 
             Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.DECRYPT_MODE, secret);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
 
             FileOutputStream os = new FileOutputStream(decrypted);
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);

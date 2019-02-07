@@ -41,6 +41,7 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.TaskCompletionSource;
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseError;
 import com.google.firebase.FirebaseException;
 import com.google.firebase.FirebaseTooManyRequestsException;
 import com.google.firebase.auth.AuthCredential;
@@ -53,6 +54,11 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.auth.PhoneAuthCredential;
 import com.google.firebase.auth.PhoneAuthProvider;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -66,6 +72,8 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 import javax.crypto.Cipher;
@@ -312,6 +320,7 @@ public class MainActivity extends Activity {
                         if (task.isSuccessful()) {
                             Log.d(TAG, "signInWithCredential:success");
                             FirebaseUser user = task.getResult().getUser();
+                            userLoggedIn();
                             loggedIn();
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
@@ -320,6 +329,81 @@ public class MainActivity extends Activity {
                         }
                     }
                 });
+    }
+
+    private void userLoggedIn(){
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        String user = mAuth.getCurrentUser().getUid();
+        DatabaseReference ref = database.getReference().child("users").child(user).child("nologins");
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                try {
+                    if (snapshot.getValue() != null) {
+                        try {
+                            Log.e("TAG", "" + snapshot.getValue()); // your name values you will get here
+                            long noLogins = (long) snapshot.getValue();
+                            noLogins++;
+                            ref.setValue(noLogins);
+                            fileOutput.setText("Success");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        Log.e("TAG", " it's null.");
+                        ref.setValue(1);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e("TAG", " it's null.");
+            }
+        });
+        Date currentTime = Calendar.getInstance().getTime();
+        DatabaseReference ref2 = database.getReference().child("log").child(user).child(currentTime.toString());
+        ref2.setValue("Logged-IN");
+    }
+
+    private void userLoggedOut(){
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        String user = mAuth.getCurrentUser().getUid();
+        DatabaseReference ref = database.getReference().child("users").child(user).child("nologouts");
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                try {
+                    if (snapshot.getValue() != null) {
+                        try {
+                            Log.e("TAG", "" + snapshot.getValue()); // your name values you will get here
+                            long noLogins = (long) snapshot.getValue();
+                            noLogins++;
+                            ref.setValue(noLogins);
+                            fileOutput.setText("Success");
+                        } catch (Exception e) {
+                            fileOutput.setText("Failure" + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    } else {
+                        Log.e("TAG", " it's null.");
+                        ref.setValue(1);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e("TAG", " it's null.");
+            }
+        });
+        Date currentTime = Calendar.getInstance().getTime();
+        DatabaseReference ref2 = database.getReference().child("log").child(user).child(currentTime.toString());
+        ref2.setValue("Logged-Out");
     }
 
     private void loggedIn(){
@@ -344,6 +428,7 @@ public class MainActivity extends Activity {
         logOut.setEnabled(false);
         upload.setEnabled(false);
         download.setEnabled(false);
+        fileOutput.setText("Logged Out");
     }
 
     private void linkPhone(){
@@ -421,6 +506,7 @@ public class MainActivity extends Activity {
         logOut.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                userLoggedOut();
                 googleSignInClient.signOut();
                 mAuth.signOut();
                 loggedOut();
@@ -516,6 +602,7 @@ public class MainActivity extends Activity {
                                 fileOutput.setText("Logged In");
                                 mLinkInProgress = true;
                                 download.setEnabled(true);
+                                userLoggedIn();
                             }else{
                                 startPhoneNumberVerification(phone);
                             }
