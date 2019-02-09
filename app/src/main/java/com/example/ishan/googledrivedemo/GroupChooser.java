@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -41,12 +42,11 @@ public class GroupChooser extends Activity {
         groupsList = (ListView) findViewById(R.id.group_list);
         current = MainActivity.mAuth.getCurrentUser();
         RetrieveAndDisplayGroups();
-
     }
 
     private void RetrieveAndDisplayGroups(){
-        DatabaseReference GroupRef = rootRef.child("group_names");
-        GroupRef.addListenerForSingleValueEvent(new ValueEventListener(){
+        DatabaseReference groupRef = rootRef.child("group_names").child(current.getUid());
+        groupRef.addListenerForSingleValueEvent(new ValueEventListener(){
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
 
@@ -70,7 +70,7 @@ public class GroupChooser extends Activity {
                         @Override
                         public void onItemClick(AdapterView<?> a, View v, int position,
                                                 long id) {
-                            startFileTransferActivity(list_of_groups.get(position));
+                            isOwner(list_of_groups.get(position));
                         }
                     });
                     groupsList.setAdapter(itemsAdapter);
@@ -85,9 +85,35 @@ public class GroupChooser extends Activity {
         });
     }
 
-    private void startFileTransferActivity(String groupName){
+    private void isOwner(String groupName){
+        DatabaseReference groupRef = rootRef.child("group_names").child(current.getUid()).child(groupName).child("owner");
+        groupRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                String owner = (String) dataSnapshot.getValue();
+                Log.d("Compare", owner + " compare " + current.getUid());
+                if(current.getUid().equals(owner)){
+                    Log.d("Test", "SUCCESS");
+                    startFileTransferActivity(groupName, true);
+                }else{
+                    Log.d("Test", "Not owner");
+                    startFileTransferActivity(groupName, false);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.d("Test", "Failure2");
+                startFileTransferActivity(groupName, false);
+            }
+        });
+    }
+
+    private void startFileTransferActivity(String groupName, boolean owner){
         Intent intent = new Intent(this, GroupSharing.class);
         intent.putExtra("group", groupName);
-        startActivity(intent);
+        intent.putExtra("isOwner", owner);
+        setResult(RESULT_OK, intent);
+        finish();
     }
 }

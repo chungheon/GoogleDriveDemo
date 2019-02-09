@@ -45,6 +45,11 @@
         android:layout_height="wrap_content"
         android:id="@+id/fileDownload"
         android:text="Download File"/>
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/keyUpload"
+        android:text="New Key"/>
 
 
 </LinearLayout>

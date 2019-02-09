@@ -24,19 +24,6 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.drive.CreateFileActivityOptions;
-import com.google.android.gms.drive.Drive;
-import com.google.android.gms.drive.DriveClient;
-import com.google.android.gms.drive.DriveContents;
-import com.google.android.gms.drive.DriveFile;
-import com.google.android.gms.drive.DriveId;
-import com.google.android.gms.drive.DriveResourceClient;
-import com.google.android.gms.drive.Metadata;
-import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.drive.OpenFileActivityOptions;
-import com.google.android.gms.drive.query.Filters;
-import com.google.android.gms.drive.query.SearchableField;
-import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.TaskCompletionSource;
@@ -89,22 +76,10 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "GoogleDriveEncryption";
     private static final int REQUEST_CODE_SIGN_IN = 0;
-    private static final int REQUEST_CODE_CREATOR = 2;
-    private static final int REQUEST_CODE_OPEN_ITEM = 5;
     private static final String KEY_VERIFY_IN_PROGRESS = "key_verify_in_progress";
-    private static final int STATE_INITIALIZED = 1;
-    private static final int STATE_CODE_SENT = 2;
-    private static final int STATE_VERIFY_FAILED = 3;
-    private static final int STATE_VERIFY_SUCCESS = 4;
-    private static final int STATE_SIGNIN_FAILED = 5;
-    private static final int STATE_SIGNIN_SUCCESS = 6;
     private SecretKeySpec secret;
 
-    private DriveClient mDriveClient;
-    private DriveResourceClient mDriveResourceClient;
-    private TaskCompletionSource<DriveId> mOpenItemTaskSource;
     public static FirebaseAuth mAuth;
-    private String retrieveExt = "";
 
     private TextView fileOutput;
     private EditText codeField;
@@ -234,6 +209,8 @@ public class MainActivity extends Activity {
                     // Invalid request
                     // [START_EXCLUDE]
                     fileOutput.setText("Invalid phone number.");
+                    loggedIn();
+                    logOut.setVisibility(View.VISIBLE);
                     // [END_EXCLUDE]
                 } else if (e instanceof FirebaseTooManyRequestsException) {
                     // The SMS quota for the project has been exceeded
@@ -259,11 +236,7 @@ public class MainActivity extends Activity {
                 mVerificationId = verificationId;
                 mResendToken = token;
                 fileOutput.setText("Code has been sent");
-                codeField.setVisibility(View.VISIBLE);
-                sendCode.setVisibility(View.VISIBLE);
-                resendCode.setVisibility(View.VISIBLE);
-                emailField.setVisibility(View.GONE);
-                pwdField.setVisibility(View.GONE);
+                verifyingPhone();
             }
         };
         // [END phone_auth_callbacks]
@@ -295,8 +268,9 @@ public class MainActivity extends Activity {
                         if (task.isSuccessful()) {
                             Log.d(TAG, "linkWithCredential:success");
                             fileOutput.setText("Linked success");
-                            FirebaseUser user = task.getResult().getUser();
+                            FirebaseUser user = mAuth.getCurrentUser();
                             loggedIn();
+                            download.setEnabled(false);
                             userLoggedIn();
                         } else {
                             Log.w(TAG, "linkWithCredential:failure", task.getException());
@@ -305,8 +279,6 @@ public class MainActivity extends Activity {
                             loggedIn();
                             download.setVisibility(View.VISIBLE);
                         }
-
-                        // ...
                     }
                 });
     }
@@ -342,11 +314,10 @@ public class MainActivity extends Activity {
                 try {
                     if (snapshot.getValue() != null) {
                         try {
-                            Log.e("TAG", "" + snapshot.getValue()); // your name values you will get here
+                            Log.e("TAG", "" + snapshot.getValue());
                             long noLogins = (long) snapshot.getValue();
                             noLogins++;
                             ref.setValue(noLogins);
-                            fileOutput.setText("Success");
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -415,7 +386,9 @@ public class MainActivity extends Activity {
         pwdField.setText("");
         pwdField.setVisibility(View.GONE);
         logOut.setEnabled(true);
+        upload.setVisibility(View.VISIBLE);
         upload.setEnabled(true);
+        download.setVisibility(View.VISIBLE);
         codeField.setVisibility(View.GONE);
         sendCode.setVisibility(View.GONE);
         resendCode.setVisibility(View.GONE);
@@ -429,6 +402,7 @@ public class MainActivity extends Activity {
         logOut.setEnabled(false);
         upload.setEnabled(false);
         download.setEnabled(false);
+        mLinkInProgress = false;
         fileOutput.setText("Logged Out");
     }
 
@@ -480,9 +454,7 @@ public class MainActivity extends Activity {
         upload.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //uploadFile();
                 Intent intent = new Intent(MainActivity.this, GroupSharing.class);
-                intent.putExtra("group", "Group Not Selected");
                 startActivity(intent);
             }
         });
@@ -559,7 +531,6 @@ public class MainActivity extends Activity {
         GoogleSignInOptions signInOptions =
                 new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestIdToken(getString(R.string.default_web_client_id))
-                        .requestScopes(Drive.SCOPE_FILE)
                         .requestEmail()
                         .build();
         return GoogleSignIn.getClient(this, signInOptions);
@@ -605,6 +576,7 @@ public class MainActivity extends Activity {
                                 download.setEnabled(true);
                                 userLoggedIn();
                             }else{
+                                verifyingPhone();
                                 startPhoneNumberVerification(phone);
                             }
                         } else {
@@ -618,6 +590,14 @@ public class MainActivity extends Activity {
                 });
     }
 
+    private void verifyingPhone(){
+        codeField.setVisibility(View.VISIBLE);
+        sendCode.setVisibility(View.VISIBLE);
+        resendCode.setVisibility(View.VISIBLE);
+        emailField.setVisibility(View.GONE);
+        pwdField.setVisibility(View.GONE);
+    }
+
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
         Log.d(TAG, "firebaseAuthWithGoogle:" + acct.getId());
 
@@ -628,27 +608,26 @@ public class MainActivity extends Activity {
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
                             AuthResult a = task.getResult();
-                            /*boolean newUser = a.getAdditionalUserInfo().isNewUser();
+                            boolean newUser = a.getAdditionalUserInfo().isNewUser();
                             if(newUser){
                                 mAuth.getCurrentUser().delete();
                                 mAuth.signOut();
                                 mAuth = FirebaseAuth.getInstance();
                                 fileOutput.setText("Invalid User");
-                            }else{*/
+                            }else {
                                 Log.d(TAG, "signInWithCredential:success");
                                 FirebaseUser user = mAuth.getCurrentUser();
                                 String phone = user.getPhoneNumber();
-                                //loggedIn();
-                                if(isNullOrEmpty(phone)){
+                                if (isNullOrEmpty(phone)) {
                                     loggedIn();
                                     fileOutput.setText("Logged In");
                                     mLinkInProgress = true;
                                     download.setEnabled(true);
                                     userLoggedIn();
-                                }else{
+                                } else {
                                     startPhoneNumberVerification(phone);
                                 }
-                            //}
+                            }
                         } else {
                             // If sign in fails, display a message to the user.
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
@@ -669,11 +648,6 @@ public class MainActivity extends Activity {
                 // Called after user is signed in.
                 if (resultCode == RESULT_OK) {
                     Log.i(TAG, "Signed in successfully.");
-                    // Use the last signed in account here since it already have a Drive scope.
-                    mDriveClient = Drive.getDriveClient(this, GoogleSignIn.getLastSignedInAccount(this));
-                    // Build a drive resource client.
-                    mDriveResourceClient =
-                            Drive.getDriveResourceClient(this, GoogleSignIn.getLastSignedInAccount(this));
                     Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
                     try {
                         GoogleSignInAccount account = task.getResult(ApiException.class);

@@ -23,7 +23,8 @@
         </activity>
         <activity android:name=".GroupSharing" />
         <activity android:name=".CreateGroup" />
-        <activity android:name=".GroupChooser"></activity>
+        <activity android:name=".GroupChooser" />
+        <activity android:name=".AddUser"></activity>
     </application>
 
 </manifest>

@@ -1,6 +1,7 @@
 package com.example.ishan.googledrivedemo;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -8,6 +9,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.google.api.services.drive.Drive;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -23,6 +25,8 @@ public class CreateGroup extends Activity {
     private TextView message;
     private long numberOfGroups;
     private DatabaseReference rootRef;
+    private String username;
+    private String userID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +42,8 @@ public class CreateGroup extends Activity {
         message = (TextView) findViewById(R.id.message);
         addGroup.setEnabled(false);
         rootRef = FirebaseDatabase.getInstance().getReference();
+        username = getIntent().getStringExtra("username");
+        userID =  MainActivity.mAuth.getCurrentUser().getUid();
         exqListener();
         calculateGroup();
     }
@@ -46,14 +52,21 @@ public class CreateGroup extends Activity {
         addGroup.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                rootRef.child("groups").child("group_" + numberOfGroups).child("members").child(MainActivity.mAuth.getCurrentUser().getUid()).setValue("owner");
-                rootRef.child("group_names").child("group_" + numberOfGroups).child("owner").setValue(MainActivity.mAuth.getCurrentUser().getUid(), new DatabaseReference.CompletionListener() {
+
+                rootRef.child("groups").child(username + "_" + numberOfGroups).child("members").child(userID).setValue("owner");
+                rootRef.child("group_names").child(userID).child(username + "_" + numberOfGroups).child("owner").setValue(userID, new DatabaseReference.CompletionListener() {
                     @Override
                     public void onComplete(@Nullable DatabaseError databaseError, @NonNull DatabaseReference databaseReference) {
                         if(databaseError == null) {
                             message.setText("Group created");
+                            Intent intent = new Intent(CreateGroup.this, GroupSharing.class);
+                            setResult(RESULT_OK, intent);
+                            finish();
                         }else{
                             message.setText("Unable to create group\n" + databaseError.getDetails());
+                            Intent intent = new Intent(CreateGroup.this, GroupSharing.class);
+                            setResult(RESULT_CANCELED, intent);
+                            finish();
                         }
                     }
                 });
@@ -62,7 +75,7 @@ public class CreateGroup extends Activity {
     }
 
     public void calculateGroup(){
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference().child("group_names");
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference().child("group_names").child(userID);
         ref.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -74,6 +87,9 @@ public class CreateGroup extends Activity {
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 tv.setText("Unable to access");
+                Intent intent = new Intent(CreateGroup.this, GroupSharing.class);
+                setResult(RESULT_CANCELED, intent);
+                finish();
             }
         });
 
