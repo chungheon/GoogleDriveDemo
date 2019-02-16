@@ -458,10 +458,10 @@ public class GroupSharing extends Activity {
                 fileExt = fileExtension;
                 String fileName = getFileName(file);
                 fileRef = fbStore.getReference().child(MainActivity.mAuth.getCurrentUser().getUid()).child(fileName);
-                File encrypted = null;
-                encrypted = new File(file.getParent() + "/UPLOAD");
+                File encrypted = new File(file.getParent() + "/UPLOAD");
                 encryptFile(file, encrypted);
-                uploadFile(encrypted, fileName, groupMembers.size() -1);
+                String hash = HashFile.hashFile(file);
+                uploadFile(encrypted, fileName, groupMembers.size()-1, hash);
             }
         });
         fileChooser.showDialog();
@@ -543,7 +543,8 @@ public class GroupSharing extends Activity {
                                     recordDownload(fileName + "." + fileExt);
                                 }else{
                                     localFile.delete();
-                                    tv.setText("Hash file has changed");
+                                    decrypted.delete();
+                                    tv.setText("Hash of file is different, file is dangerous and has been deleted");
                                     recordDownload(fileName + "." + fileExt + " (Dangerous)");
                                 }
 
@@ -582,7 +583,7 @@ public class GroupSharing extends Activity {
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
-                // Uh-oh, an error occurred!
+                tv.setText(exception.getMessage());
             }
         });
     }
@@ -680,6 +681,7 @@ public class GroupSharing extends Activity {
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
 
             outputStream.write(inputBytes);
+
             /*byte[] input = new byte[64000];
 
             int bytesRead;
@@ -768,7 +770,7 @@ public class GroupSharing extends Activity {
         }
     }
 
-    private void uploadFile(File file, String fileName,int count){
+    private void uploadFile(File file, String fileName,int count, String hash){
         if(count == -1){
             recordUpload(currentUser.getUid(), fileName);
             file.delete();
@@ -781,8 +783,8 @@ public class GroupSharing extends Activity {
             e.printStackTrace();
         }
 
-        String hash = HashFile.hashFile(file);
         String signedHash = signHash(hash);
+
 
         if(!signedHash.equals("Error")){
             String member = groupMembers.get(count);
@@ -808,9 +810,9 @@ public class GroupSharing extends Activity {
                     }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                         @Override
                         public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                            tv.setText(tv.getText()+ " Successfully uploaded " + member + "\n");
+                            tv.setText(tv.getText()+ " " + hash + " Successfully uploaded " + member + "\n");
                             rootRef.child("storage").child("groups").child(groupName).child(member).child(fileName).setValue("");
-                            uploadFile(file, fileName, count-1);
+                            uploadFile(file, fileName, count-1, hash);
                         }
                     });
                 }else{
