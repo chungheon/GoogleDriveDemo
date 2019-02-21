@@ -30,6 +30,11 @@
         android:layout_height="wrap_content"
         android:id="@+id/addUser"
         android:text="Add"/>
+    <Button android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/kickUser"
+            android:text="Kick Member"/>
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

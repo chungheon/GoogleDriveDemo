@@ -2,9 +2,11 @@ package com.example.ishan.googledrivedemo;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.ContactsContract;
 import android.security.KeyPairGeneratorSpec;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
@@ -66,13 +68,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.InvalidKeySpecException;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -95,6 +91,7 @@ public class GroupSharing extends Activity {
     private final int REQUEST_CREATEGROUP= 1;
     private final int REQUEST_ADDUSER = 2;
     private final int REQUEST_SELECTGROUP = 3;
+    private final int REQUEST_KICKUSER = 4;
     private DatabaseReference rootRef;
     private FirebaseStorage fbStore;
     private FirebaseUser currentUser;
@@ -103,6 +100,7 @@ public class GroupSharing extends Activity {
     private StorageReference fileRef;
     private String fileExt;
     private long numberOfGroups;
+    private Button kickUser;
     private Button groupAddBtn;
     private Button addBtn;
     private Button uploadFile;
@@ -115,8 +113,10 @@ public class GroupSharing extends Activity {
     private ArrayList<String> groupMembers;
     private ArrayList<Pair<String, Pair<Key, Certificate>>> keys;
     private boolean groupSelected = false;
+    private ArrayList<Pair<String,String>> userNames;
     private boolean isOwner = false;
     private String nameUser;
+    private ArrayList<String> users;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,9 +139,13 @@ public class GroupSharing extends Activity {
         userGroup = (Button) findViewById(R.id.viewGroups);
         downloadFile = (Button) findViewById(R.id.fileDownload);
         uploadKey = (Button) findViewById(R.id.keyUpload);
+        kickUser = (Button) findViewById(R.id.kickUser);
         addBtn.setVisibility(View.VISIBLE);
         groupMembers = new ArrayList<String>();
+        userNames = new ArrayList<>();
+        users = new ArrayList<>();
         addBtn.setEnabled(false);
+        kickUser.setEnabled(false);
         uploadFile.setEnabled(false);
         groupName = "Group Not Selected";
         tv.setText("Group Not Selected");
@@ -178,6 +182,17 @@ public class GroupSharing extends Activity {
             }
         });
 
+        kickUser.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                if(groupSelected){
+                    startKickMemberActivity();
+                }else{
+                    Toast.makeText(GroupSharing.this, "Please select a group first", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
         uploadKey.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -202,10 +217,6 @@ public class GroupSharing extends Activity {
                 startGroupChoosingActivity();
             }
         });
-
-        if(groupSelected){
-            getGroupMembersList();
-        }
     }
 
     private void getUserName(){
@@ -221,6 +232,66 @@ public class GroupSharing extends Activity {
                 finish();
             }
         });
+    }
+
+    private void getNames(){
+        DatabaseReference groupRef = rootRef.child("users");
+        groupRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                users.clear();
+                userNames.clear();
+                Iterator iterator = dataSnapshot.getChildren().iterator();
+                while(iterator.hasNext()){
+                    DataSnapshot userInfo = (DataSnapshot) iterator.next();
+                    String uid = userInfo.getKey();
+                    users.add(uid);
+                    Iterator iterator1 = userInfo.getChildren().iterator();
+                    while(iterator1.hasNext()){
+                        DataSnapshot info = (DataSnapshot) iterator1.next();
+                        if(info.getKey().equals("name")){
+                            userNames.add(new Pair<String, String>((String) info.getValue(), uid));
+                            if(userNames.size() == users.size()){
+                                addBtn.setEnabled(true);
+                                kickUser.setEnabled(true);
+                            }
+                        }
+                    }
+                    tv.setText(tv.getText());
+                }
+                //getMemberName();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Toast.makeText(GroupSharing.this,"Error", Toast.LENGTH_SHORT);
+                tv.setText("Connection unstable");
+            }
+        });
+    }
+
+    private void getMemberName(){
+        for(String uid: users){
+            DatabaseReference userRef = rootRef.child("users").child(uid).child("name");
+            userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    String name = dataSnapshot.getKey();
+                    userNames.add(new Pair<String, String>(name, uid));
+                    if(userNames.size() == users.size()){
+                        addBtn.setEnabled(true);
+                        kickUser.setEnabled(true);
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    Toast.makeText(GroupSharing.this,"Error", Toast.LENGTH_SHORT);
+                    tv.setText("Connection unstable");
+                }
+            });
+        }
+
     }
 
     private void getGroupMembersList(){
@@ -244,7 +315,7 @@ public class GroupSharing extends Activity {
                     groupMembers.clear();
                     groupMembers.addAll(set);
                 }
-                addBtn.setEnabled(true);
+                keys.clear();
                 for(String member: groupMembers){
                     getPublicKey(member);
                 }
@@ -263,6 +334,10 @@ public class GroupSharing extends Activity {
             case REQUEST_ADDUSER:
                 if(resultCode == RESULT_OK) {
                     tv.setText("User Added to group");
+                    Bundle args = data.getExtras();
+                    String uid  = args.getString("groupmembers");
+                    uploadFile.setEnabled(false);
+                    getGroupMembersList();
                 }else{
                     tv.setText("Unable to add user");
                 }
@@ -281,18 +356,30 @@ public class GroupSharing extends Activity {
                         this.groupSelected = true;
                         isOwner = args.getBoolean("isOwner", false);
                         addBtn.setEnabled(false);
+                        kickUser.setEnabled(false);
                         tv.setText(groupName);
                         if(isOwner){
                             addBtn.setVisibility(View.VISIBLE);
+                            kickUser.setVisibility(View.VISIBLE);
                         }else{
                             addBtn.setVisibility(View.GONE);
+                            kickUser.setVisibility(View.GONE);
                         }
+                        getNames();
                         getGroupMembersList();
                     }else{
                         tv.setText("Unable to select group");
                     }
-
                     break;
+            case REQUEST_KICKUSER:
+                    if(resultCode == RESULT_OK){
+                        Bundle args = data.getExtras();
+                        tv.setText("Member has been removed");
+                        uploadFile.setEnabled(false);
+                        getGroupMembersList();
+                    }else{
+                        tv.setText("Unable to remove member");
+                    }
         }
     }
 
@@ -444,9 +531,45 @@ public class GroupSharing extends Activity {
     private void startAddUserActivity(){
         Intent intent = new Intent (this, AddUser.class);
         intent.putExtra("group", groupName);
-        intent.putStringArrayListExtra("groupmembers", groupMembers);
+        ArrayList<String> names = new ArrayList<>();
+        ArrayList<String> uid = new ArrayList<>();
+        for(Pair<String, String> user: userNames){
+            if(!inGroup(user.second)){
+                names.add(user.first);
+                uid.add(user.second);
+            }
+        }
+        intent.putExtra("usernames", names);
+        intent.putExtra("groupmembers", uid);
         startActivityForResult(intent, REQUEST_ADDUSER);
     }
+
+    private boolean inGroup(String user){
+        for(String uid: groupMembers){
+            if(user.equals(uid)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void startKickMemberActivity(){
+        Intent intent = new Intent(GroupSharing.this, KickMember.class);
+        intent.putExtra("group", groupName);
+        ArrayList<String> names = new ArrayList<>();
+        ArrayList<String> uid = new ArrayList<>();
+        for(Pair<String, String> user: userNames){
+            tv.setText(tv.getText() + " " + groupMembers.size());
+            if(inGroup(user.second) && !user.second.equals(currentUser.getUid())){
+                names.add(user.first);
+                uid.add(user.second);
+            }
+        }
+        intent.putExtra("usernames", names);
+        intent.putExtra("groupmembers", uid);
+        startActivityForResult(intent, REQUEST_KICKUSER);
+    }
+
 
     private void selectFile(){
         FileChooser fileChooser = new FileChooser(this);
@@ -773,46 +896,54 @@ public class GroupSharing extends Activity {
     private void uploadFile(File file, String fileName,int count, String hash){
         if(count == -1){
             recordUpload(currentUser.getUid(), fileName);
+            tv.setText("Successfully Uploaded");
             file.delete();
             return;
         }
-        InputStream stream = null;
-        try {
-            stream = new FileInputStream(file);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
         String signedHash = signHash(hash);
-
-
         if(!signedHash.equals("Error")){
             String member = groupMembers.get(count);
                 Key key = getKey(member);
                 String encryptedKey = encryptKey(secret, key);
                 if(!encryptedKey.equals("Failed")){
                     fileRef = fbStore.getReference().child(member).child(fileName);
-                    StorageMetadata metadata = new StorageMetadata.Builder()
-                            .setContentType(fileExt)
-                            .setCustomMetadata("hash", hash)
-                            .setCustomMetadata("signedhash", signedHash)
-                            .setCustomMetadata("secretkey", encryptedKey)
-                            .setCustomMetadata("sender", currentUser.getUid())
-                            .setCustomMetadata("receiver", member)
-                            .build();
+                    fileRef.getDownloadUrl().addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            InputStream stream = null;
+                            try {
+                                stream = new FileInputStream(file);StorageMetadata metadata = new StorageMetadata.Builder()
+                                        .setContentType(fileExt)
+                                        .setCustomMetadata("hash", hash)
+                                        .setCustomMetadata("signedhash", signedHash)
+                                        .setCustomMetadata("secretkey", encryptedKey)
+                                        .setCustomMetadata("sender", currentUser.getUid())
+                                        .setCustomMetadata("receiver", member)
+                                        .build();
 
-                    uploadTask = fileRef.putStream(stream, metadata);
-                    uploadTask.addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception exception) {
-                            tv.setText("Failure to upload " + member);
+                                uploadTask = fileRef.putStream(stream, metadata);
+                                uploadTask.addOnFailureListener(new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception exception) {
+                                        tv.setText("Failure to upload " + member);
+                                    }
+                                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                                    @Override
+                                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                                        rootRef.child("storage").child("groups").child(groupName).child(member).child(fileName).setValue("");
+                                        uploadFile(file, fileName, count-1, hash);
+                                    }
+                                });
+
+                            } catch (FileNotFoundException fileException) {
+                                tv.setText(fileException.getMessage());
+                            }
                         }
-                    }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                    }).addOnSuccessListener(new OnSuccessListener<Uri>() {
                         @Override
-                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                            tv.setText(tv.getText()+ " " + hash + " Successfully uploaded " + member + "\n");
-                            rootRef.child("storage").child("groups").child(groupName).child(member).child(fileName).setValue("");
-                            uploadFile(file, fileName, count-1, hash);
+                        public void onSuccess(Uri uri) {
+                            Random r = new Random();
+                            uploadFile(file, fileName + r.nextInt(), count, hash);
                         }
                     });
                 }else{
