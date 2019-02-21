@@ -357,6 +357,7 @@ public class GroupSharing extends Activity {
                         isOwner = args.getBoolean("isOwner", false);
                         addBtn.setEnabled(false);
                         kickUser.setEnabled(false);
+                        uploadFile.setEnabled(false);
                         tv.setText(groupName);
                         if(isOwner){
                             addBtn.setVisibility(View.VISIBLE);
