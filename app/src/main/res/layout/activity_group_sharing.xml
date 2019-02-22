@@ -1,60 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".GroupSharing"
-    android:orientation="vertical">
+<android.support.constraint.ConstraintLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".GroupSharing"
+        android:background="#108cf3">
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:id="@+id/debug"
-        android:text="debug message"/>
-
-    <Button
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:id="@+id/createGroup"
-        android:text="Create Group"/>
-
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/viewGroups"
-        android:text="View user groups"/>
-
-    <Button
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:id="@+id/addUser"
-        android:text="Add"/>
-    <Button android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/kickUser"
-            android:text="Kick Member"/>
+            android:id="@+id/display"
+            android:text="messageDisplay" tools:layout_editor_absoluteX="1dp"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+    <Button
+            android:text="Create Group"
+            android:layout_height="81dp"
+            android:id="@+id/createGroup"
+            android:layout_weight="0"
+            android:layout_width="186dp"
+            android:layout_marginTop="20dp"
+            app:layout_constraintTop_toBottomOf="@+id/display" android:layout_marginStart="8dp"
+            app:layout_constraintStart_toStartOf="parent" android:layout_marginEnd="8dp"
+            app:layout_constraintEnd_toEndOf="parent"/>
+    <Button
+            android:text="View User Group"
+            android:layout_width="186dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/viewGroups" android:layout_marginEnd="8dp" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp" app:layout_constraintTop_toBottomOf="@+id/createGroup"/>
+    <Button
+            android:text="Add"
+            android:layout_width="113dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/addUser" app:layout_constraintStart_toStartOf="parent" android:layout_marginStart="56dp"
+            android:layout_marginTop="24dp" app:layout_constraintTop_toBottomOf="@+id/viewGroups"/>
+    <Button
+            android:text="Download File"
+            android:layout_width="135dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/fileDownload" android:layout_marginTop="24dp"
+            app:layout_constraintTop_toBottomOf="@+id/kickUser" app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginEnd="32dp"/>
+    <Button
+            android:text="Upload File"
+            android:layout_width="114dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/fileUpload" android:layout_marginTop="24dp"
+            app:layout_constraintTop_toBottomOf="@+id/addUser" app:layout_constraintStart_toStartOf="parent"
+            android:layout_marginStart="8dp" app:layout_constraintEnd_toStartOf="@+id/fileDownload"
+            android:layout_marginEnd="8dp"/>
+    <Button
+            android:text="New Key"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/keyUpload" android:layout_marginTop="32dp"
+            app:layout_constraintTop_toBottomOf="@+id/fileDownload" app:layout_constraintStart_toStartOf="parent"
+            android:layout_marginStart="8dp" app:layout_constraintEnd_toEndOf="parent" android:layout_marginEnd="8dp"
+            app:layout_constraintHorizontal_bias="0.496"/>
+    <Button
+            android:text="Kick"
+            android:layout_width="114dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/kickUser" android:layout_marginTop="24dp"
+            app:layout_constraintTop_toBottomOf="@+id/viewGroups" app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginEnd="52dp" app:layout_constraintStart_toEndOf="@+id/addUser"
+            android:layout_marginStart="8dp" app:layout_constraintHorizontal_bias="0.975"/>
+    <Button
+            android:text="Logout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/logOut" android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@+id/keyUpload" app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginEnd="8dp" app:layout_constraintStart_toStartOf="parent"
+            android:layout_marginStart="8dp"/>
 
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/displayID"/>
-
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/fileUpload"
-        android:text="Upload File"/>
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/fileDownload"
-        android:text="Download File"/>
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/keyUpload"
-        android:text="New Key"/>
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+    android:id="@+id/displayID"/>
 
 
-</LinearLayout>
+</android.support.constraint.ConstraintLayout>

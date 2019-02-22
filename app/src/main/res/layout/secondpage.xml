@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent"
+              android:layout_height="match_parent" android:background="#108cf3">
+
+    <Button
+            android:text="Create Group"
+            android:layout_height="81dp"
+            android:id="@+id/createGroup"
+            android:layout_weight="0"
+            android:layout_width="186dp"
+            tools:layout_editor_absoluteY="29dp"
+            tools:layout_editor_absoluteX="99dp"/>
+    <Button
+            android:text="View User Group"
+            android:layout_width="186dp"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="136dp"
+            tools:layout_editor_absoluteX="99dp"
+            android:id="@+id/viewGroups"/>
+    <Button
+            android:text="Add"
+            android:layout_width="113dp"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="211dp"
+            tools:layout_editor_absoluteX="44dp"
+            android:id="@+id/addUser"/>
+    <Button
+            android:text="Download File"
+            android:layout_width="135dp"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="282dp"
+            tools:layout_editor_absoluteX="217dp"
+            android:id="@+id/fileDownload"/>
+    <Button
+            android:text="Upload File"
+            android:layout_width="114dp"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="282dp"
+            tools:layout_editor_absoluteX="44dp"
+            android:id="@+id/fileUpload"/>
+    <Button
+            android:text="New Key"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="358dp"
+            tools:layout_editor_absoluteX="148dp"
+            android:id="@+id/keyUpload"/>
+    <Button
+            android:text="Kick"
+            android:layout_width="114dp"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="211dp"
+            tools:layout_editor_absoluteX="227dp"
+            android:id="@+id/kickUser"/>
+    <Button
+            android:text="Logout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="431dp"
+            tools:layout_editor_absoluteX="147dp"
+            android:id="@+id/logOut"/>
+</android.support.constraint.ConstraintLayout>

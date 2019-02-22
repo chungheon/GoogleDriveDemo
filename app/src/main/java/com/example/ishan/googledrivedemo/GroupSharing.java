@@ -107,6 +107,7 @@ public class GroupSharing extends Activity {
     private Button userGroup;
     private Button downloadFile;
     private Button uploadKey;
+    private Button logOutBtn;
     private TextView groupNum;
     private SecretKeySpec secret;
     private String groupName;
@@ -131,7 +132,7 @@ public class GroupSharing extends Activity {
         rootRef = FirebaseDatabase.getInstance().getReference();
         currentUser = MainActivity.mAuth.getCurrentUser();
         fbStore = FirebaseStorage.getInstance();
-        tv = (TextView) findViewById(R.id.debug);
+        tv = (TextView) findViewById(R.id.display);
         groupAddBtn = (Button) findViewById(R.id.createGroup);
         addBtn = (Button) findViewById(R.id.addUser);
         uploadFile = (Button) findViewById(R.id.fileUpload);
@@ -141,6 +142,7 @@ public class GroupSharing extends Activity {
         uploadKey = (Button) findViewById(R.id.keyUpload);
         kickUser = (Button) findViewById(R.id.kickUser);
         addBtn.setVisibility(View.VISIBLE);
+        logOutBtn = (Button) findViewById(R.id.logOut);
         groupMembers = new ArrayList<String>();
         userNames = new ArrayList<>();
         users = new ArrayList<>();
@@ -215,6 +217,14 @@ public class GroupSharing extends Activity {
             @Override
             public void onClick(View v) {
                 startGroupChoosingActivity();
+            }
+        });
+
+        logOutBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setResult(RESULT_OK);
+                finish();
             }
         });
     }

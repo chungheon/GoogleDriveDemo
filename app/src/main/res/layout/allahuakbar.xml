@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                                             xmlns:tools="http://schemas.android.com/tools"
+                                             android:layout_width="match_parent"
+                                             android:layout_height="match_parent" android:background="#108cf3">
+
+    <Button
+            android:text="Login"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="196dp"
+            tools:layout_editor_absoluteX="16dp"
+            android:id="@+id/logIn"/>
+
+    <EditText android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              tools:layout_editor_absoluteY="125dp"
+              tools:layout_editor_absoluteX="0dp"
+              android:background="#ffffff"
+              android:id="@+id/pwd"/>
+
+    <EditText android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:id="@+id/email"
+              tools:layout_editor_absoluteY="62dp"
+              tools:layout_editor_absoluteX="0dp"
+              android:background="#ffffff"/>
+    <Button
+            android:text="Login with E-mail"
+            android:layout_width="174dp"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="274dp"
+            tools:layout_editor_absoluteX="16dp"
+            android:id="@+id/logInEmail"/>
+    <TextView
+            android:text="E-mail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="43dp"
+            tools:layout_editor_absoluteX="0dp"/>
+    <TextView
+            android:text="Password"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:layout_editor_absoluteY="105dp"
+            tools:layout_editor_absoluteX="0dp"/>
+
+</android.support.constraint.ConstraintLayout>

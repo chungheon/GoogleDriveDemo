@@ -46,6 +46,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import org.w3c.dom.Text;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -78,6 +79,7 @@ public class MainActivity extends Activity {
     private static final int REQUEST_CODE_SIGN_IN = 0;
     private static final String KEY_VERIFY_IN_PROGRESS = "key_verify_in_progress";
     private SecretKeySpec secret;
+    private final int GROUP_SHARE_LOG_OUT = 3;
 
     public static FirebaseAuth mAuth;
 
@@ -86,14 +88,13 @@ public class MainActivity extends Activity {
     private EditText emailField;
     private EditText pwdField;
     private Button logIn;
-    private Button logOut;
-    private Button upload;
-    private Button download;
     private Button sendCode;
     private Button resendCode;
     private Button logInEmail;
     private GoogleSignInClient googleSignInClient;
     private boolean doubleBackToExitPressedOnce = false;
+    private TextView emailLabel;
+    private TextView passLabel;
 
     private boolean mVerificationInProgress = false;
     private boolean mLinkInProgress = false;
@@ -134,9 +135,6 @@ public class MainActivity extends Activity {
     private void initWork() {
         this.fileOutput = (TextView) findViewById(R.id.textOutput);
         this.logIn = (Button) findViewById(R.id.logIn);
-        this.logOut = (Button) findViewById(R.id.logOut);
-        this.upload = (Button) findViewById(R.id.uploadFile);
-        this.download = (Button) findViewById(R.id.download);
         this.googleSignInClient = buildGoogleSignInClient();
         this.codeField = (EditText) findViewById(R.id.code);
         this.sendCode = (Button) findViewById(R.id.sendCode);
@@ -144,14 +142,13 @@ public class MainActivity extends Activity {
         this.logInEmail = (Button) findViewById(R.id.logInEmail);
         this.emailField = (EditText) findViewById(R.id.email);
         this.pwdField = (EditText) findViewById(R.id.pwd);
+        this.passLabel = (TextView) findViewById(R.id.labelPass);
+        this.emailLabel = (TextView) findViewById(R.id.labelEmail);
 
         this.sendCode.setVisibility(View.GONE);
         this.resendCode.setVisibility(View.GONE);
         this.codeField.setVisibility(View.GONE);
 
-        this.logOut.setEnabled(false);
-        this.upload.setEnabled(false);
-        this.download.setEnabled(false);
 
         byte[] ivBytes;
         String password="Hello";
@@ -210,7 +207,6 @@ public class MainActivity extends Activity {
                     // [START_EXCLUDE]
                     fileOutput.setText("Invalid phone number.");
                     loggedIn();
-                    logOut.setVisibility(View.VISIBLE);
                     // [END_EXCLUDE]
                 } else if (e instanceof FirebaseTooManyRequestsException) {
                     // The SMS quota for the project has been exceeded
@@ -270,14 +266,12 @@ public class MainActivity extends Activity {
                             fileOutput.setText("Linked success");
                             FirebaseUser user = mAuth.getCurrentUser();
                             loggedIn();
-                            download.setEnabled(false);
                             userLoggedIn();
                         } else {
                             Log.w(TAG, "linkWithCredential:failure", task.getException());
                             Toast.makeText(MainActivity.this, "Failed to link",
                                     Toast.LENGTH_SHORT).show();
                             loggedIn();
-                            download.setVisibility(View.VISIBLE);
                         }
                     }
                 });
@@ -295,6 +289,7 @@ public class MainActivity extends Activity {
                             FirebaseUser user = task.getResult().getUser();
                             userLoggedIn();
                             loggedIn();
+                            startGroupSharing();
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
                             fileOutput.setText("Invalid Code");
@@ -385,13 +380,11 @@ public class MainActivity extends Activity {
         emailField.setVisibility(View.GONE);
         pwdField.setText("");
         pwdField.setVisibility(View.GONE);
-        logOut.setEnabled(true);
-        upload.setVisibility(View.VISIBLE);
-        upload.setEnabled(true);
-        download.setVisibility(View.VISIBLE);
         codeField.setVisibility(View.GONE);
         sendCode.setVisibility(View.GONE);
         resendCode.setVisibility(View.GONE);
+        emailLabel.setVisibility(View.GONE);
+        passLabel.setVisibility(View.GONE);
     }
 
     private void loggedOut(){
@@ -399,9 +392,8 @@ public class MainActivity extends Activity {
         logInEmail.setVisibility(View.VISIBLE);
         emailField.setVisibility(View.VISIBLE);
         pwdField.setVisibility(View.VISIBLE);
-        logOut.setEnabled(false);
-        upload.setEnabled(false);
-        download.setEnabled(false);
+        emailLabel.setVisibility(View.VISIBLE);
+        passLabel.setVisibility(View.VISIBLE);
         mLinkInProgress = false;
         fileOutput.setText("Logged Out");
     }
@@ -415,9 +407,6 @@ public class MainActivity extends Activity {
         pwdField.setVisibility(View.GONE);
         sendCode.setVisibility(View.GONE);
         resendCode.setVisibility(View.GONE);
-        logOut.setVisibility(View.GONE);
-        upload.setVisibility(View.GONE);
-        download.setVisibility(View.GONE);
     }
 
     private void resendVerificationCode(String phoneNumber,
@@ -451,40 +440,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        upload.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, GroupSharing.class);
-                startActivity(intent);
-            }
-        });
-
-        download.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mLinkInProgress = true;
-                codeField.setVisibility(View.VISIBLE);
-                linkPhone();
-                String newPhone = codeField.getText().toString();
-                if(isNullOrEmpty(newPhone)){
-                    fileOutput.setText("Please enter a phone number");
-                    download.setVisibility(View.VISIBLE);
-                }else{
-                    startPhoneNumberVerification(newPhone);
-                }
-
-            }
-        });
-
-        logOut.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                userLoggedOut();
-                googleSignInClient.signOut();
-                mAuth.signOut();
-                loggedOut();
-            }
-        });
 
         sendCode.setOnClickListener(new View.OnClickListener(){
             @Override
@@ -559,6 +514,11 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private void startGroupSharing(){
+        Intent intent = new Intent(MainActivity.this, GroupSharing.class);
+        startActivityForResult(intent, GROUP_SHARE_LOG_OUT);
+    }
+
     private void firebaseAuthWithEmailPwd(String email, String password){
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
@@ -573,7 +533,7 @@ public class MainActivity extends Activity {
                                 loggedIn();
                                 fileOutput.setText("Logged In");
                                 mLinkInProgress = true;
-                                download.setEnabled(true);
+                                startGroupSharing();
                                 userLoggedIn();
                             }else{
                                 verifyingPhone();
@@ -622,7 +582,7 @@ public class MainActivity extends Activity {
                                     loggedIn();
                                     fileOutput.setText("Logged In");
                                     mLinkInProgress = true;
-                                    download.setEnabled(true);
+                                    startGroupSharing();
                                     userLoggedIn();
                                 } else {
                                     startPhoneNumberVerification(phone);
@@ -659,6 +619,12 @@ public class MainActivity extends Activity {
                     fileOutput.setText("Failed to sign in");
                 }
                 break;
+            case GROUP_SHARE_LOG_OUT:
+                if(resultCode == RESULT_OK){
+                    userLoggedOut();
+                    loggedOut();
+                    mAuth.signOut();
+                }
         }
     }
 
