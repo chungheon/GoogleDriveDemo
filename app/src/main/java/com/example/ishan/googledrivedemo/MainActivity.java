@@ -95,6 +95,7 @@ public class MainActivity extends Activity {
     private boolean doubleBackToExitPressedOnce = false;
     private TextView emailLabel;
     private TextView passLabel;
+    private Button linkPhone;
 
     private boolean mVerificationInProgress = false;
     private boolean mLinkInProgress = false;
@@ -115,9 +116,7 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (doubleBackToExitPressedOnce) {
-            super.onBackPressed();
-            googleSignInClient.signOut();
-            return;
+            finish();
         }
 
         this.doubleBackToExitPressedOnce = true;
@@ -144,7 +143,6 @@ public class MainActivity extends Activity {
         this.pwdField = (EditText) findViewById(R.id.pwd);
         this.passLabel = (TextView) findViewById(R.id.labelPass);
         this.emailLabel = (TextView) findViewById(R.id.labelEmail);
-
         this.sendCode.setVisibility(View.GONE);
         this.resendCode.setVisibility(View.GONE);
         this.codeField.setVisibility(View.GONE);
@@ -188,7 +186,6 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "onVerificationCompleted:" + credential);
                 // [START_EXCLUDE silent]
                 mVerificationInProgress = false;
-                mLinkInProgress = false;
                 // [END_EXCLUDE]
             }
 
@@ -199,22 +196,12 @@ public class MainActivity extends Activity {
                 Log.w(TAG, "onVerificationFailed", e);
                 // [START_EXCLUDE silent]
                 mVerificationInProgress = false;
-                mLinkInProgress = false;
                 // [END_EXCLUDE]
 
-                if (e instanceof FirebaseAuthInvalidCredentialsException) {
-                    // Invalid request
-                    // [START_EXCLUDE]
-                    fileOutput.setText("Invalid phone number.");
-                    loggedIn();
-                    // [END_EXCLUDE]
-                } else if (e instanceof FirebaseTooManyRequestsException) {
-                    // The SMS quota for the project has been exceeded
-                    // [START_EXCLUDE]
-                    fileOutput.setText("Text Sent Quota exceeded");
-                    // [END_EXCLUDE]
-                }
-
+                loggedIn();
+                loggedOut();
+                mAuth.signOut();
+                fileOutput.setText(e.getMessage());
                 // Show a message and update the UI
                 // [START_EXCLUDE]
                 // [END_EXCLUDE]
@@ -239,11 +226,13 @@ public class MainActivity extends Activity {
     }
 
     private void startPhoneNumberVerification(String phoneNumber) {
+        emailLabel.setVisibility(View.GONE);
+        passLabel.setVisibility(View.GONE);
         codeField.setText("");
         // [START start_phone_auth]
         PhoneAuthProvider.getInstance().verifyPhoneNumber(
                 phoneNumber,        // Phone number to verify
-                30,                 // Timeout duration
+                60,                 // Timeout duration
                 TimeUnit.SECONDS,   // Unit of timeout
                 this,               // Activity (for callback binding)
                 mCallbacks);        // OnVerificationStateChangedCallbacks
@@ -253,9 +242,21 @@ public class MainActivity extends Activity {
     }
 
     private void linkPhoneNumberWithCode(String verificationId, String code){
+        if(isNullOrEmpty(verificationId) || isNullOrEmpty(code)){
+            loggedIn();
+            loggedOut();
+            fileOutput.setText("Unable to verify");
+            return;
+        }
         // [START verify_with_code]
         PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationId, code);
         // [END verify_with_code]
+        if(credential == null){
+            loggedIn();
+            loggedOut();
+            fileOutput.setText("Unable to verify");
+            return;
+        }
 
         mAuth.getCurrentUser().linkWithCredential(credential)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
@@ -267,19 +268,36 @@ public class MainActivity extends Activity {
                             FirebaseUser user = mAuth.getCurrentUser();
                             loggedIn();
                             userLoggedIn();
+                            startGroupSharing();
+                            mLinkInProgress = false;
                         } else {
                             Log.w(TAG, "linkWithCredential:failure", task.getException());
                             Toast.makeText(MainActivity.this, "Failed to link",
                                     Toast.LENGTH_SHORT).show();
+                            emailField.setText("");
+                            pwdField.setText("");
                             loggedIn();
+                            loggedOut();
+                            mLinkInProgress = false;
                         }
                     }
                 });
     }
 
     private void verifyPhoneNumberWithCode(String verificationId, String code) {
+        if(isNullOrEmpty(verificationId) || isNullOrEmpty(code)){
+            loggedIn();
+            loggedOut();
+            fileOutput.setText("Unable to verify");
+            return;
+        }
         PhoneAuthCredential credential = PhoneAuthProvider.getCredential(verificationId, code);
-
+        if(credential == null){
+            loggedIn();
+            loggedOut();
+            fileOutput.setText("Unable to verify");
+            return;
+        }
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                     @Override
@@ -293,7 +311,9 @@ public class MainActivity extends Activity {
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
                             fileOutput.setText("Invalid Code");
+                            loggedIn();
                             loggedOut();
+                            fileOutput.setText(fileOutput.getText() + "\nOTP wrong! Please try again!");
                         }
                     }
                 });
@@ -385,6 +405,7 @@ public class MainActivity extends Activity {
         resendCode.setVisibility(View.GONE);
         emailLabel.setVisibility(View.GONE);
         passLabel.setVisibility(View.GONE);
+        emailLabel.setText("E-mail");
     }
 
     private void loggedOut(){
@@ -394,15 +415,18 @@ public class MainActivity extends Activity {
         pwdField.setVisibility(View.VISIBLE);
         emailLabel.setVisibility(View.VISIBLE);
         passLabel.setVisibility(View.VISIBLE);
+        linkPhone.setVisibility(View.VISIBLE);
         mLinkInProgress = false;
+        emailLabel.setText("E-mail");
         fileOutput.setText("Logged Out");
     }
 
     private void linkPhone(){
         logIn.setVisibility(View.GONE);
         logInEmail.setVisibility(View.GONE);
+        emailField.setVisibility(View.VISIBLE);
+        emailLabel.setText("Phone Number");
         emailField.setText("");
-        emailField.setVisibility(View.GONE);
         pwdField.setText("");
         pwdField.setVisibility(View.GONE);
         sendCode.setVisibility(View.GONE);
@@ -435,8 +459,7 @@ public class MainActivity extends Activity {
     private void exqListener() {
         logIn.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) {
-                signIn();
+            public void onClick(View v) { signIn();
             }
         });
 
@@ -455,7 +478,11 @@ public class MainActivity extends Activity {
         resendCode.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                resendVerificationCode(mAuth.getCurrentUser().getPhoneNumber(), mResendToken);
+                if(mLinkInProgress){
+                    resendVerificationCode(emailField.getText().toString(), mResendToken);
+                }else{
+                    resendVerificationCode(mAuth.getCurrentUser().getPhoneNumber(), mResendToken);
+                }
             }
         });
 
@@ -465,6 +492,19 @@ public class MainActivity extends Activity {
                 if(isNullOrEmpty(emailField.getText().toString()) || isNullOrEmpty(pwdField.getText().toString())) {
                     fileOutput.setText("Please enter your acct and password");
                 }else{
+                    firebaseAuthWithEmailPwd(emailField.getText().toString(), pwdField.getText().toString());
+                }
+            }
+        });
+
+        linkPhone.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(mLinkInProgress){
+                    startPhoneNumberVerification(emailField.getText().toString());
+                    verifyingPhone();
+                }else{
+                    mLinkInProgress = true;
                     firebaseAuthWithEmailPwd(emailField.getText().toString(), pwdField.getText().toString());
                 }
             }
@@ -527,14 +567,17 @@ public class MainActivity extends Activity {
                         if (task.isSuccessful()) {
                             // Sign in success, update UI with the signed-in user's information
                             Log.d(TAG, "signInWithEmail:success");
+                            loggedIn();
                             FirebaseUser user = mAuth.getCurrentUser();
                             String phone = user.getPhoneNumber();
                             if(isNullOrEmpty(phone)){
-                                loggedIn();
                                 fileOutput.setText("Logged In");
-                                mLinkInProgress = true;
-                                startGroupSharing();
-                                userLoggedIn();
+                                if(!mLinkInProgress){
+                                    startGroupSharing();
+                                    userLoggedIn();
+                                }else{
+                                    linkPhone();
+                                }
                             }else{
                                 verifyingPhone();
                                 startPhoneNumberVerification(phone);
@@ -543,6 +586,7 @@ public class MainActivity extends Activity {
                             // If sign in fails, display a message to the user.
                             Log.w(TAG, "signInWithEmail:failure", task.getException());
                             fileOutput.setText("Invalid user");
+                            mLinkInProgress = false;
                         }
 
                         // ...
@@ -556,6 +600,9 @@ public class MainActivity extends Activity {
         resendCode.setVisibility(View.VISIBLE);
         emailField.setVisibility(View.GONE);
         pwdField.setVisibility(View.GONE);
+        logIn.setVisibility(View.GONE);
+        logInEmail.setVisibility(View.GONE);
+        linkPhone.setVisibility(View.GONE);
     }
 
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
@@ -581,11 +628,11 @@ public class MainActivity extends Activity {
                                 if (isNullOrEmpty(phone)) {
                                     loggedIn();
                                     fileOutput.setText("Logged In");
-                                    mLinkInProgress = true;
                                     startGroupSharing();
-                                    userLoggedIn();
                                 } else {
+                                    loggedIn();
                                     startPhoneNumberVerification(phone);
+                                    verifyingPhone();
                                 }
                             }
                         } else {
@@ -623,6 +670,7 @@ public class MainActivity extends Activity {
                 if(resultCode == RESULT_OK){
                     userLoggedOut();
                     loggedOut();
+                    googleSignInClient.signOut();
                     mAuth.signOut();
                 }
         }

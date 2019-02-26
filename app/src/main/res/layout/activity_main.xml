@@ -8,22 +8,31 @@
     android:background="#108cf3">
 
     <Button
-            android:text="Login"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/logIn" android:layout_marginTop="8dp" app:layout_constraintTop_toTopOf="parent"
-            android:layout_marginBottom="8dp" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent" android:layout_marginStart="8dp"
-            app:layout_constraintEnd_toEndOf="parent" android:layout_marginEnd="8dp"
-            app:layout_constraintHorizontal_bias="0.028" app:layout_constraintVertical_bias="0.46"/>
+        android:id="@+id/logIn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Login"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.028"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.454" />
 
     <EditText android:layout_width="match_parent"
               android:layout_height="wrap_content"
               tools:layout_editor_absoluteX="0dp"
               android:background="#ffffff"
               android:id="@+id/pwd" android:layout_marginBottom="344dp"
-              app:layout_constraintBottom_toBottomOf="parent" android:layout_marginTop="8dp"
-              app:layout_constraintTop_toBottomOf="@+id/labelPass" app:layout_constraintVertical_bias="0.0"/>
+              app:layout_constraintBottom_toBottomOf="parent"
+              android:layout_marginTop="8dp"
+              app:layout_constraintTop_toBottomOf="@+id/labelPass"
+              app:layout_constraintVertical_bias="0.0"
+              android:inputType="textPassword"/>
 
     <EditText android:layout_width="match_parent"
               android:layout_height="wrap_content"
@@ -32,15 +41,22 @@
               android:background="#ffffff" android:layout_marginTop="8dp"
               android:layout_marginBottom="8dp" app:layout_constraintBottom_toBottomOf="parent"
               app:layout_constraintVertical_bias="0.0" app:layout_constraintTop_toBottomOf="@+id/labelEmail"/>
+
     <Button
-            android:text="Login with E-mail"
-            android:layout_width="174dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/logInEmail" android:layout_marginTop="8dp" app:layout_constraintTop_toTopOf="parent"
-            android:layout_marginBottom="8dp" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent" android:layout_marginStart="8dp"
-            app:layout_constraintEnd_toEndOf="parent" android:layout_marginEnd="8dp"
-            app:layout_constraintHorizontal_bias="0.041" app:layout_constraintVertical_bias="0.568"/>
+        android:id="@+id/logInEmail"
+        android:layout_width="174dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Login with E-mail"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.041"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/logIn"
+        app:layout_constraintVertical_bias="0.026" />
     <TextView
             android:text="E-mail"
             android:layout_width="wrap_content"
@@ -56,20 +72,30 @@
             android:id="@+id/labelPass"
             app:layout_constraintTop_toBottomOf="@+id/email" app:layout_constraintStart_toStartOf="parent"
             android:layout_marginTop="12dp"/>
+
     <Button
-            android:text="Send Code"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            tools:layout_editor_absoluteX="78dp" android:id="@+id/sendCode" android:layout_marginTop="8dp"
-            app:layout_constraintTop_toTopOf="parent" android:layout_marginBottom="8dp"
-            app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintVertical_bias="0.217"/>
+        android:id="@+id/sendCode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Send Code"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/code"
+        app:layout_constraintVertical_bias="0.099"
+        tools:layout_editor_absoluteX="75dp" />
+
     <Button
-            android:text="Resend Code"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            tools:layout_editor_absoluteX="0dp" android:id="@+id/resendCode" android:layout_marginBottom="8dp"
-            app:layout_constraintBottom_toBottomOf="parent" android:layout_marginTop="8dp"
-            app:layout_constraintTop_toTopOf="parent" app:layout_constraintVertical_bias="0.324"/>
+        android:id="@+id/resendCode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Resend Code"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/sendCode"
+        app:layout_constraintVertical_bias="0.006"
+        tools:layout_editor_absoluteX="0dp" />
     <EditText android:layout_width="match_parent"
               android:layout_height="wrap_content"
               android:background="#ffffff"
@@ -77,7 +103,6 @@
               android:layout_marginTop="8dp" app:layout_constraintTop_toTopOf="parent"
               tools:layout_editor_absoluteX="0dp" app:layout_constraintVertical_bias="0.0"/>
     <TextView
-            android:text="TextView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             tools:layout_editor_absoluteX="0dp"

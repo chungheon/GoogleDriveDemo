@@ -57,10 +57,12 @@ public class KickMember extends Activity {
 
     private void kickMember(int position){
         String uid = groupMembers.get(position);
+        DatabaseReference storeRef = rootRef.child("storage").child("groups").child(groupName).child(current.getUid());
         DatabaseReference groupRef = rootRef.child("group_names").child(uid).child(groupName);
         groupRef.removeValue();
         groupRef = rootRef.child("groups").child(groupName).child("members").child(uid);
         groupRef.removeValue();
+        storeRef.removeValue();
         userNames.remove(position);
         groupMembers.remove(position);
         startFileTransferActivity();

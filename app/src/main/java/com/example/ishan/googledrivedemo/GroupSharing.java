@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.ContactsContract;
 import android.security.KeyPairGeneratorSpec;
 import android.security.keystore.KeyGenParameterSpec;
@@ -19,8 +20,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.util.Base64;
 
+import com.google.android.gms.auth.api.signin.internal.Storage;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.common.io.ByteArrayDataOutput;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -37,16 +40,7 @@ import org.apache.http.conn.util.PublicSuffixMatcherLoader;
 import org.bouncycastle.jce.provider.JDKPSSSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectOutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.security.InvalidKeyException;
@@ -118,6 +112,7 @@ public class GroupSharing extends Activity {
     private boolean isOwner = false;
     private String nameUser;
     private ArrayList<String> users;
+    private boolean doubleBackToExitPressedOnce = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -244,7 +239,7 @@ public class GroupSharing extends Activity {
         });
     }
 
-    private void getNames(){
+    private void getNames() {
         DatabaseReference groupRef = rootRef.child("users");
         groupRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -252,56 +247,30 @@ public class GroupSharing extends Activity {
                 users.clear();
                 userNames.clear();
                 Iterator iterator = dataSnapshot.getChildren().iterator();
-                while(iterator.hasNext()){
+                while (iterator.hasNext()) {
                     DataSnapshot userInfo = (DataSnapshot) iterator.next();
                     String uid = userInfo.getKey();
                     users.add(uid);
                     Iterator iterator1 = userInfo.getChildren().iterator();
-                    while(iterator1.hasNext()){
+                    while (iterator1.hasNext()) {
                         DataSnapshot info = (DataSnapshot) iterator1.next();
-                        if(info.getKey().equals("name")){
+                        if (info.getKey().equals("name")) {
                             userNames.add(new Pair<String, String>((String) info.getValue(), uid));
-                            if(userNames.size() == users.size()){
+                            if (userNames.size() == users.size()) {
                                 addBtn.setEnabled(true);
                                 kickUser.setEnabled(true);
                             }
                         }
                     }
-                    tv.setText(tv.getText());
                 }
-                //getMemberName();
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                Toast.makeText(GroupSharing.this,"Error", Toast.LENGTH_SHORT);
+                Toast.makeText(GroupSharing.this, "Error", Toast.LENGTH_SHORT);
                 tv.setText("Connection unstable");
             }
         });
-    }
-
-    private void getMemberName(){
-        for(String uid: users){
-            DatabaseReference userRef = rootRef.child("users").child(uid).child("name");
-            userRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    String name = dataSnapshot.getKey();
-                    userNames.add(new Pair<String, String>(name, uid));
-                    if(userNames.size() == users.size()){
-                        addBtn.setEnabled(true);
-                        kickUser.setEnabled(true);
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Toast.makeText(GroupSharing.this,"Error", Toast.LENGTH_SHORT);
-                    tv.setText("Connection unstable");
-                }
-            });
-        }
-
     }
 
     private void getGroupMembersList(){
@@ -354,7 +323,7 @@ public class GroupSharing extends Activity {
                 break;
                 case REQUEST_CREATEGROUP:
                     if(resultCode == RESULT_OK) {
-                        tv.setText("Group Created/n" + groupName);
+                        tv.setText("Group Created\n" + groupName);
                     }else{
                         tv.setText("Unabled to create group");
                     }
@@ -402,31 +371,6 @@ public class GroupSharing extends Activity {
         String mAlias = MainActivity.mAuth.getCurrentUser().getUid();
         KeyPairGenerator kpGenerator = KeyPairGenerator
                 .getInstance("RSA");
-        AlgorithmParameterSpec spec;
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-
-            spec = new KeyPairGeneratorSpec.Builder(this)
-                    .setAlias(mAlias)
-                    .setSubject(new X500Principal("CN=" + mAlias))
-                    .setSerialNumber(BigInteger.valueOf(1337))
-                    .setStartDate(start.getTime())
-                    .setEndDate(end.getTime())
-                    .build();
-
-
-        } else {
-            spec = new KeyGenParameterSpec.Builder(mAlias, KeyProperties.PURPOSE_SIGN)
-                    .setCertificateSubject(new X500Principal("CN=" + mAlias))
-                    .setDigests(KeyProperties.DIGEST_SHA256)
-                    .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
-                    .setCertificateSerialNumber(BigInteger.valueOf(1337))
-                    .setCertificateNotBefore(start.getTime())
-                    .setCertificateNotAfter(end.getTime())
-                    .build();
-        }
-
-
         KeyPair kp = kpGenerator.generateKeyPair();
 
         try {
@@ -522,9 +466,49 @@ public class GroupSharing extends Activity {
                 // taskSnapshot.getMetadata() contains file metadata such as size, content-type, etc.
                 // ...
                 tv.setText("New key set");
+                removeGroupFiles();
+                uploadFile.setEnabled(false);
+                getGroupMembersList();
                 keystore.delete();
             }
         });
+    }
+
+    private void removeGroupFiles(){
+        DatabaseReference ref = rootRef.child("storage").child("groups");
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                ArrayList<DataSnapshot> groups = new ArrayList<>();
+                Iterator iterator = dataSnapshot.getChildren().iterator();
+
+                while(iterator.hasNext())
+                {
+                    DataSnapshot group = (DataSnapshot) iterator.next();
+                    Iterator iterator1 = group.getChildren().iterator();
+                    while(iterator1.hasNext()){
+                        DataSnapshot user = (DataSnapshot) iterator1.next();
+                        if(user.getKey().equals(currentUser.getUid())){
+
+                            ref.child(group.getKey()).child(user.getKey()).removeValue();
+                        }
+                    }
+                }
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                tv.setText("Failed to remove storage");
+            }
+        });
+    }
+
+    private boolean inGroups(String group, List<String> groups){
+        for(String s: groups){
+            if(group.equals(s)){
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -570,7 +554,6 @@ public class GroupSharing extends Activity {
         ArrayList<String> names = new ArrayList<>();
         ArrayList<String> uid = new ArrayList<>();
         for(Pair<String, String> user: userNames){
-            tv.setText(tv.getText() + " " + groupMembers.size());
             if(inGroup(user.second) && !user.second.equals(currentUser.getUid())){
                 names.add(user.first);
                 uid.add(user.second);
@@ -659,6 +642,7 @@ public class GroupSharing extends Activity {
                     e.printStackTrace();
                 }
                 if(signatureVerified){
+                    tv.setText("Signature Verified");
                     File localFile = new File(baseDir + "/Encrypted." + fileExt);
                     File decrypted = new File(baseDir + "/" + fileName + "." + fileExt);
 
@@ -673,7 +657,7 @@ public class GroupSharing extends Activity {
                                 String decryptHash = HashFile.hashFile(decrypted);
                                 if(verifyHash(hash, decryptHash)){
                                     localFile.delete();
-                                    tv.setText("Downloaded file");
+                                    tv.setText("Downloaded file, Data Verified");
                                     recordDownload(fileName + "." + fileExt);
                                 }else{
                                     localFile.delete();
@@ -694,23 +678,23 @@ public class GroupSharing extends Activity {
                         });
 
                     } catch (KeyStoreException e) {
-                        tv.setText("KeyStoreException");
+                        tv.setText("KeyStoreException\n" + e.getMessage());
                     } catch (CertificateException e) {
-                        tv.setText("CertificateException");
+                        tv.setText("CertificateException\n" + e.getMessage());
                     } catch (NoSuchAlgorithmException e) {
-                        tv.setText("NoSuchAlgorithmException");
+                        tv.setText("NoSuchAlgorithmException\n" + e.getMessage());
                     } catch (IOException e) {
-                        tv.setText("IOException");
+                        tv.setText(tv.getText().toString() + "\nIOException\n" + e.getMessage());
                     } catch (UnrecoverableKeyException e) {
-                        tv.setText("UnrecoverableKeyException");
+                        tv.setText("UnrecoverableKeyException\n" + e.getMessage());
                     } catch (InvalidKeyException e) {
-                        tv.setText("InvalidKeyException");
+                        tv.setText("InvalidKeyException\n" + e.getMessage());
                     } catch (NoSuchPaddingException e) {
-                        tv.setText("NoSuchPaddingException");
+                        tv.setText("NoSuchPaddingException\n" + e.getMessage());
                     } catch (BadPaddingException e) {
-                        tv.setText("BadPaddingException");
+                        tv.setText("BadPaddingException\n" + e.getMessage());
                     } catch (IllegalBlockSizeException e) {
-                        tv.setText("IllegalBlockSizeException");
+                        tv.setText(tv.getText().toString() + "\nIllegalBlockSizeException\n" + e.getMessage());
                     }
                 }
             }
@@ -738,7 +722,13 @@ public class GroupSharing extends Activity {
         Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         cipher.init(Cipher.DECRYPT_MODE, key);
         byte[] decryptedText = Base64.decode(encrypted, 0);
-        SecretKeySpec keyAES = new SecretKeySpec(cipher.doFinal(decryptedText), "AES");
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
+        outputStream.write(decryptedText);
+        outputStream.close();
+        byte[] decryptedKey = os.toByteArray();
+        SecretKeySpec keyAES = new SecretKeySpec(decryptedKey, "AES");
+        os.close();
         return keyAES;
     }
 
@@ -751,7 +741,6 @@ public class GroupSharing extends Activity {
 
             Cipher cipher = Cipher.getInstance("AES");
             cipher.init(Cipher.DECRYPT_MODE, secretKey);
-
             FileOutputStream os = new FileOutputStream(decrypted);
             CipherOutputStream outputStream = new CipherOutputStream(os, cipher);
             outputStream.write(inputBytes);
@@ -770,8 +759,6 @@ public class GroupSharing extends Activity {
             decrypted.delete();
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
-        }finally {
-            //encrypted.delete();
         }
     }
 
@@ -779,7 +766,7 @@ public class GroupSharing extends Activity {
         try {
 
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-            keyGen.init(256); // for example
+            keyGen.init(256);
             SecretKey secretKey = keyGen.generateKey();
             secret = new SecretKeySpec(secretKey.getEncoded(), "AES");
             /*AES for future reference
@@ -936,7 +923,7 @@ public class GroupSharing extends Activity {
                                 uploadTask.addOnFailureListener(new OnFailureListener() {
                                     @Override
                                     public void onFailure(@NonNull Exception exception) {
-                                        tv.setText("Failure to upload " + member);
+                                        tv.setText("Failure to upload to " + getMemberName(member));
                                     }
                                 }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                                     @Override
@@ -963,6 +950,15 @@ public class GroupSharing extends Activity {
         }else{
             tv.setText("Unable to sign hash");
         }
+    }
+
+    private String getMemberName(String memUID){
+        for(Pair<String, String> p: userNames){
+            if(p.second.equals(memUID)){
+                return p.first;
+            }
+        }
+        return "\"failed to identify member's name\"";
     }
 
     private Key getKey(String user){
@@ -1108,6 +1104,23 @@ public class GroupSharing extends Activity {
             tv.setText("Invalid Key SignHash");
         }
         return "Error";
+    }
+
+    public void onBackPressed() {
+        if (doubleBackToExitPressedOnce){
+            setResult(RESULT_OK);
+            finish();
+        }
+
+        this.doubleBackToExitPressedOnce = true;
+        Toast.makeText(this, "Click BACK again to exit", Toast.LENGTH_SHORT).show();
+
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                doubleBackToExitPressedOnce = false;
+            }
+        }, 2000);
     }
 
 }
